@@ -1060,8 +1060,12 @@ export function createRoomUI(net, profile, onRace) {
             <strong class="wp-bots-count" aria-live="polite">${botCount}</strong>
             <button type="button" class="wp-bots-btn" id="wp-bots-plus" aria-label="Añadir un bot" ${botCount >= botMax ? 'disabled' : ''}>${ICONS.plus}</button>
           </div>` : ''}
-          <p id="waiting-help" class="wp-waiting-help">
-            ${host && !net.supportsBots && room.botTarget === 0 && pendingBots ? 'Reinicia el servidor para usar bots.' : 'Esperando a que el anfitrión inicie la salida.'}
+          <p id="waiting-help" class="wp-waiting-help"${net.legacyServer ? ' role="alert" style="color:#ffb9a3"' : ''}>
+            ${net.legacyServer
+              // Servidor antiguo (sin versión de protocolo en el WELCOME): el perfil viaja sin alas y
+              // todos ven a los demás con las alas 0. Se avisa aquí, donde se nota el fallo.
+              ? '⚠ El servidor en marcha es una versión antigua y no comparte las alas: los demás se ven con alas de ángel. Cierra todos los servidores (taskkill /IM node.exe /F) y vuelve a ejecutar npm start.'
+              : host && !net.supportsBots && room.botTarget === 0 && pendingBots ? 'Reinicia el servidor para usar bots.' : 'Esperando a que el anfitrión inicie la salida.'}
           </p>
 
           <button class="wp-btn-launch-race" id="launch-race" ${host ? '' : 'hidden'}>
