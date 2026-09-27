@@ -70,18 +70,19 @@ export function mountApi(app, {auth, economy, config, onEquipmentChanged = () =>
         if (!known) console.error('[api]', method.toUpperCase(), path, error);
         send({status: `${known ? error.status : 500} Error`, json: {error: known ? error.code : 'server_error', detail: known ? error.detail : undefined}});
       };
-      const run = body => {
+      const run = async body => {
         try {
           if (!allow(group, ctx.ip)) throw new EconomyError('rate_limited', 429);
-          ctx.session = auth.session(ctx.cookies[SESSION_COOKIE]);
+          ctx.session = await auth.session(ctx.cookies[SESSION_COOKIE]);
           ctx.userId = ctx.session?.userId || null;
           if (csrf) {
             if (!ctx.userId) throw new EconomyError('login_required', 401);
-            const from = ctx.origin || (ctx.referer ? new URL(ctx.referer).origin : '');
+            let from = ctx.origin;
+            if (!from && ctx.referer) try { from = new URL(ctx.referer).origin; } catch {}
             if (from !== origin || ctx.csrf !== ctx.session.csrf) throw new EconomyError('csrf_failed', 403);
           }
           ctx.body = body;
-          Promise.resolve(handler(ctx)).then(send, fail);
+          send(await handler(ctx));
         } catch (error) { fail(error); }
       };
       if (method !== 'post') return run({});
@@ -100,22 +101,23 @@ export function mountApi(app, {auth, economy, config, onEquipmentChanged = () =>
     });
   }
 
-  const profileOf = userId => {
-    const user = economy.getUser(userId);
+  const profileOf = async userId => {
+    const user = await economy.getUser(userId);
+    if (!user) throw new EconomyError('login_required', 401);
     return {
       authenticated: true, csrf: null,
       user: {id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, createdAt: user.createdAt, localMigrated: !!user.localMigrated},
-      identities: auth.identities(userId), wallet: economy.wallet(userId),
-      inventory: economy.inventory(userId), equipped: economy.equipped(userId)
+      identities: await auth.identities(userId), wallet: await economy.wallet(userId),
+      inventory: await economy.inventory(userId), equipped: await economy.equipped(userId)
     };
   };
   const providers = () => ({google: auth.enabled('google'), discord: auth.enabled('discord')});
 
   // ---------- Autenticación ----------
   for (const provider of ['google', 'discord']) {
-    route('get', `/auth/${provider}/start`, ctx => {
+    route('get', `/auth/${provider}/start`, async ctx => {
       try {
-        const {location, cookies} = auth.start(provider, ctx.query.mode === 'link' ? 'link' : 'login', ctx.userId, ctx.cookies[BROWSER_COOKIE]);
+        const {location, cookies} = await auth.start(provider, ctx.query.mode === 'link' ? 'link' : 'login', ctx.userId, ctx.cookies[BROWSER_COOKIE]);
         return {redirect: location, cookies};
       } catch (error) {
         if (error instanceof EconomyError) return {redirect: '/?auth_error=' + encodeURIComponent(error.code)};
@@ -126,53 +128,57 @@ export function mountApi(app, {auth, economy, config, onEquipmentChanged = () =>
       try {
         const result = await auth.callback(provider, ctx.query, ctx.cookies[BROWSER_COOKIE], ctx.userId);
         if (result.mode === 'link') return {redirect: '/?auth=linked&provider=' + provider};
-        if (ctx.session) auth.destroySession(ctx.cookies[SESSION_COOKIE]);   // no heredar sesiones previas
-        return {redirect: '/?auth=ok&provider=' + provider + (result.created ? '&new=1' : ''), cookies: [auth.sessionCookie(auth.createSession(result.userId))]};
+        if (ctx.session) await auth.destroySession(ctx.cookies[SESSION_COOKIE]);   // no heredar sesiones previas
+        return {redirect: '/?auth=ok&provider=' + provider + (result.created ? '&new=1' : ''), cookies: [auth.sessionCookie(await auth.createSession(result.userId))]};
       } catch (error) {
         if (error instanceof EconomyError) return {redirect: '/?auth_error=' + encodeURIComponent(error.code) + '&provider=' + provider};
         throw error;
       }
     }, {group: 'auth', csrf: false});
   }
-  route('post', '/auth/logout', ctx => {
-    auth.destroySession(ctx.cookies[SESSION_COOKIE]);
+  route('post', '/auth/logout', async ctx => {
+    await auth.destroySession(ctx.cookies[SESSION_COOKIE]);
     return {json: {ok: true}, cookies: [auth.clearSessionCookie()]};
   }, {group: 'write'});
 
   // ---------- Cuenta ----------
-  route('get', '/api/me', ctx => {
+  route('get', '/api/me', async ctx => {
     const payments_ = {enabled: !!payments.enabled};
     if (!ctx.userId) return {json: {authenticated: false, providers: providers(), payments: payments_}};
-    return {json: {...profileOf(ctx.userId), csrf: ctx.session.csrf, providers: providers(), payments: payments_}};
+    return {json: {...await profileOf(ctx.userId), csrf: ctx.session.csrf, providers: providers(), payments: payments_}};
   });
-  route('post', '/api/account/nickname', ctx => ({json: {nickname: economy.setNickname(ctx.userId, ctx.body.nickname)}}), {group: 'write'});
-  route('post', '/api/account/unlink', ctx => ({json: {identities: auth.unlink(ctx.userId, String(ctx.body.provider || ''))}}), {group: 'write'});
-  route('post', '/api/account/migrate-local', ctx => {
+  route('post', '/api/account/nickname', async ctx => {
+    const nickname = await economy.setNickname(ctx.userId, ctx.body.nickname);
+    onEquipmentChanged(ctx.userId);
+    return {json: {nickname}};
+  }, {group: 'write'});
+  route('post', '/api/account/unlink', async ctx => ({json: {identities: await auth.unlink(ctx.userId, String(ctx.body.provider || ''))}}), {group: 'write'});
+  route('post', '/api/account/migrate-local', async ctx => {
     const pick = v => Number.isInteger(v) ? v : undefined;
-    const result = economy.migrateLocal(ctx.userId, {character: pick(ctx.body.character), board: pick(ctx.body.board), wing: pick(ctx.body.wing), hat: pick(ctx.body.hat)});
+    const result = await economy.migrateLocal(ctx.userId, {character: pick(ctx.body.character), board: pick(ctx.body.board), wing: pick(ctx.body.wing), hat: pick(ctx.body.hat)});
     if (result.migrated) onEquipmentChanged(ctx.userId);
     return {json: result};
   }, {group: 'write'});
 
   // ---------- La tiendita ----------
-  route('get', '/api/shop/catalog', ctx => ({json: {items: economy.catalog(ctx.userId), wallet: ctx.userId ? economy.wallet(ctx.userId) : null}}));
-  route('post', '/api/shop/purchase', ctx => ({json: economy.purchase(ctx.userId, String(ctx.body.itemId || ''), ctx.body.requestId)}), {group: 'write'});
-  route('post', '/api/shop/equip', ctx => {
-    const equipped = economy.equip(ctx.userId, String(ctx.body.itemId || ''));
+  route('get', '/api/shop/catalog', async ctx => ({json: {items: await economy.catalog(ctx.userId), wallet: ctx.userId ? await economy.wallet(ctx.userId) : null}}));
+  route('post', '/api/shop/purchase', async ctx => ({json: await economy.purchase(ctx.userId, String(ctx.body.itemId || ''), ctx.body.requestId)}), {group: 'write'});
+  route('post', '/api/shop/equip', async ctx => {
+    const equipped = await economy.equip(ctx.userId, String(ctx.body.itemId || ''));
     onEquipmentChanged(ctx.userId);
     return {json: {equipped}};
   }, {group: 'write'});
-  route('get', '/api/wallet/transactions', ctx => {
+  route('get', '/api/wallet/transactions', async ctx => {
     if (!ctx.userId) throw new EconomyError('login_required', 401);
-    return {json: {transactions: economy.transactions(ctx.userId, Number(ctx.query.limit) || 30), wallet: economy.wallet(ctx.userId)}};
+    return {json: {transactions: await economy.transactions(ctx.userId, Number(ctx.query.limit) || 30), wallet: await economy.wallet(ctx.userId)}};
   });
 
   // ---------- Conseguir monedas ----------
-  route('get', '/api/coins/packages', () => ({json: {packages: economy.packages()}}));
-  route('post', '/api/coins/exchange', ctx => ({json: economy.exchange(ctx.userId, String(ctx.body.packageId || ''), ctx.body.requestId)}), {group: 'write'});
+  route('get', '/api/coins/packages', async () => ({json: {packages: await economy.packages()}}));
+  route('post', '/api/coins/exchange', async ctx => ({json: await economy.exchange(ctx.userId, String(ctx.body.packageId || ''), ctx.body.requestId)}), {group: 'write'});
 
   // ---------- Pagos reales (preparado, deshabilitado) ----------
-  route('get', '/api/payments/products', () => ({json: {enabled: !!payments.enabled, products: economy.goldProducts()}}));
+  route('get', '/api/payments/products', async () => ({json: {enabled: !!payments.enabled, products: await economy.goldProducts()}}));
   route('post', '/api/payments/checkout', () => { throw new EconomyError('payments_disabled', 503); }, {group: 'write'});
   // El webhook del proveedor no lleva sesión ni CSRF: se validará con su firma cuando exista la
   // integración. Hasta entonces no acepta nada (no se acredita oro por peticiones sin verificar).

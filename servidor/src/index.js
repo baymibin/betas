@@ -12,7 +12,7 @@ import {botLooks, createBotPlayer, createBrain, botInput, MAX_PARTICIPANTS} from
 import {currentManifest, fileHash, embedManifest} from './asset-manifest.js';
 import {createInputQueue, pushInput, nextInput, resetInputs} from './input-queue.js';
 import {statSync, existsSync} from 'node:fs';
-import {openDatabase, syncCatalog, loadEconomyConfig} from './db.js';
+import {openDatabase, syncCatalog, loadEconomyConfig, describeDatabase} from './db.js';
 import {createEconomy} from './economy.js';
 import {authConfig, createAuth, SESSION_COOKIE} from './auth.js';
 import {mountApi, parseCookies} from './api.js';
@@ -22,22 +22,32 @@ const clientRoot = fileURLToPath(new URL('../../client/', import.meta.url));
 const envFile = fileURLToPath(new URL('../.env', import.meta.url));
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 // ---------- Cuentas y economía ----------
+// DATABASE_URL elige el motor: mysql://... (MySQL/MariaDB, p. ej. aaPanel) o SQLite por defecto.
 const economyConfig = loadEconomyConfig();
-const db = openDatabase();
-syncCatalog(db, economyConfig);
+let db;
+try { db = await openDatabase(); }
+catch (error) { console.error('[db] No se pudo abrir la base de datos (' + describeDatabase() + '):', error.message); process.exit(1); }
+await syncCatalog(db, economyConfig);
 const economy = createEconomy(db, economyConfig);
+await economy.loadCache();
 const authSettings = authConfig();
 const auth = createAuth(db, economy, authSettings);
 const socketsByUser = new Map();   // surf_user_id -> conexiones /play abiertas
 // Equipamiento visible en carrera: con sesión manda la cuenta (lo equipado y poseído); como
 // invitado solo se aceptan artículos gratuitos. El nick de una cuenta es el de su perfil.
+// Con cuenta se consulta la base de datos sin frenar el bucle de juego; solo se aplica la
+// respuesta más reciente y nunca a una conexión ya cerrada.
 function applyProfile(d, requested) {
   if (d.userId) {
-    const user = economy.getUser(d.userId), eq = economy.equipped(d.userId);
-    if (user) { Object.assign(d.player, {character: eq.character, board: eq.board, wing: eq.wing, hat: eq.hat, nick: user.nickname}); return; }
+    const version = d.profileVersion = (d.profileVersion || 0) + 1;
+    Promise.all([economy.getUser(d.userId), economy.equipped(d.userId)]).then(([user, eq]) => {
+      if (d.closed || version !== d.profileVersion || !user) return;
+      Object.assign(d.player, {character: eq.character, board: eq.board, wing: eq.wing, hat: eq.hat, nick: user.nickname});
+    }, error => console.error('[economy] perfil', error.message));
+    return;
   }
   const look = {...requested};
-  for (const slot of ['character', 'board', 'wing', 'hat']) if (!economy.canUse(null, slot, look[slot] | 0)) look[slot] = 0;
+  for (const slot of ['character', 'board', 'wing', 'hat']) if (!economy.isFree(slot, look[slot] | 0)) look[slot] = 0;
   Object.assign(d.player, look);
 }
 function refreshEquipment(userId) { for (const ws of socketsByUser.get(userId) || []) applyProfile(ws.getUserData(), {}); }
@@ -45,8 +55,8 @@ function startRace(room) { room.started = true; room.raceId = randomUUID(); room
 // Recompensa de llegada, calculada aquí con el puesto real (nunca con datos del cliente).
 function rewardFinish(d, room) {
   if (!d.userId || !room.raceId) return;
-  try { economy.rewardRace(d.userId, room.raceId, d.player.place, room.humansAtStart || room.size); }
-  catch (error) { console.error('[economy] recompensa de carrera', error); }
+  economy.rewardRace(d.userId, room.raceId, d.player.place, room.humansAtStart || room.size)
+    .catch(error => console.error('[economy] recompensa de carrera', error.message));
 }
 const screenshotsRoot = fileURLToPath(new URL('../artifacts/screenshots/', import.meta.url));
 mkdirSync(screenshotsRoot, {recursive:true});
@@ -87,8 +97,14 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
   maxPayloadLength: 64, maxBackpressure: 16384, closeOnBackpressureLimit: true, idleTimeout: 30,
   // La sesión viaja en la cookie HttpOnly del handshake: el WebSocket nunca recibe tokens.
   upgrade(res, req, context) {
-    const session = auth.session(parseCookies(req.getHeader('cookie'))[SESSION_COOKIE]);
-    res.upgrade({userId: session?.userId || null}, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
+    // uWS invalida req tras la primera espera: se copian las cabeceras antes de consultar la sesión.
+    const key = req.getHeader('sec-websocket-key'), protocol = req.getHeader('sec-websocket-protocol'), extensions = req.getHeader('sec-websocket-extensions');
+    const token = parseCookies(req.getHeader('cookie'))[SESSION_COOKIE];
+    let aborted = false;
+    res.onAborted(() => { aborted = true; });
+    auth.session(token).catch(() => null).then(session => {
+      if (!aborted) res.cork(() => res.upgrade({userId: session?.userId || null}, key, protocol, extensions, context));
+    });
   },
   open(ws) {
     const data = ws.getUserData(); if(data.userId){if(!socketsByUser.has(data.userId))socketsByUser.set(data.userId,new Set());socketsByUser.get(data.userId).add(ws);} data.player = createPlayer(nextId++); applyProfile(data,{}); data.inputs = createInputQueue();
@@ -111,7 +127,7 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
       pushInput(d.inputs,seq,v.getInt8(12)/127,v.getUint8(13)&15,performance.now());
     } catch { ws.end(1008, 'Invalid input'); }
   },
-  close(ws) {const d=ws.getUserData(),room=d.room;if(d.userId){const set=socketsByUser.get(d.userId);set?.delete(ws);if(!set?.size)socketsByUser.delete(d.userId);}if(!room)return;room.delete(ws);if(!room.size){room.bots.length=0;rooms.delete(room);publishLobby();}else{if(room.hostId===d.player.id)room.hostId=[...room][0].getUserData().player.id;syncBots(room);broadcastRoom(room);}}
+  close(ws) {const d=ws.getUserData(),room=d.room;d.closed=true;if(d.userId){const set=socketsByUser.get(d.userId);set?.delete(ws);if(!set?.size)socketsByUser.delete(d.userId);}if(!room)return;room.delete(ws);if(!room.size){room.bots.length=0;rooms.delete(room);publishLobby();}else{if(room.hostId===d.player.id)room.hostId=[...room][0].getUserData().player.id;syncBots(room);broadcastRoom(room);}}
 }).post('/save-screenshot', (res, req) => {
   let buffer = Buffer.alloc(0);
   console.log('[server] receiving screenshot data...');
@@ -218,5 +234,6 @@ mountApi(app, {auth, economy, config: authSettings, onEquipmentChanged: refreshE
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));
+  console.log('Base de datos: ' + describeDatabase());
   console.log('Cuentas: Google ' + (auth.enabled('google') ? 'activo' : 'sin configurar') + ' · Discord ' + (auth.enabled('discord') ? 'activo' : 'sin configurar') + ' · pagos reales deshabilitados');
 });

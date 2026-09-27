@@ -19,7 +19,7 @@ Desde esta fase el juego tiene **cuentas permanentes** (Google y Discord), una *
 
 - **Cliente:** HTML + JavaScript ES modules sin bundler, **Babylon.js 9.26.1** (CDN jsDelivr) para el 3D, CSS propio y fuente Baloo 2 (Google Fonts). Service Worker para caché de assets.
 - **Servidor:** **Node.js ≥ 22.13** + **uWebSockets.js 20.67** (HTTP y WebSocket en el mismo proceso).
-- **Base de datos:** **SQLite** embebido de Node (`node:sqlite`, sin dependencias nuevas). El esquema es SQL estándar y se puede portar a MySQL o PostgreSQL.
+- **Base de datos:** **MySQL / MariaDB** (librería `mysql2`, p. ej. la base de datos de aaPanel) **o SQLite** embebido de Node (`node:sqlite`). Se elige con `DATABASE_URL`; mismo modelo y mismas reglas en los dos.
 - **Protocolo de juego:** binario propio (ArrayBuffer/DataView, little-endian), versión 3. Simulación compartida cliente/servidor a 30 Hz.
 - **Autenticación:** Google OpenID Connect y Discord OAuth2, ambos con *authorization code flow* en el servidor.
 
@@ -30,7 +30,7 @@ Navegador ── HTTP ──> uWebSockets.js (servidor/src/index.js)
    │                    ├─ archivos del cliente (client/) con ETag y caché
    │                    ├─ /auth/*  login Google/Discord  (src/auth.js)
    │                    ├─ /api/*   cuenta, tienda, monedas, pagos (src/api.js)
-   │                    │             └─ src/economy.js ──> SQLite (src/db.js)
+   │                    │             └─ src/economy.js ──> src/db.js ──> MySQL/MariaDB  o  SQLite
    ├─ WS /lobby ──────> lista de salas
    └─ WS /play  ──────> carreras (cola de inputs, bots, power-ups, snapshots 30 Hz)
                           └─ la sesión viaja en la cookie del handshake: el servidor
@@ -53,16 +53,17 @@ client/
   styles/                    ui.css, home.css, multiplayer.css, account.css
 servidor/
   src/index.js               servidor HTTP/WS, salas, bucle de simulación
-  src/db.js                  SQLite, migraciones, sincronización del catálogo
+  src/db.js                  capa de base de datos (MySQL/MariaDB o SQLite), migraciones, catálogo
   src/economy.js             monedero, compras, conversión, recompensas, pagos
   src/auth.js                Google/Discord, sesiones, vinculación
   src/api.js                 rutas HTTP, CSRF, límite de peticiones
   src/input-queue.js         cola de inputs por jugador
-  migrations/*.sql           migraciones (se aplican una vez, en orden)
+  migrations/mysql/*.sql     migraciones para MySQL/MariaDB
+  migrations/sqlite/*.sql    migraciones para SQLite (mismo modelo)
   config/economy.json        configuración central de la economía
   scripts/admin-economy.mjs  ajustes administrativos por consola
-  test/*.test.js             pruebas automáticas (npm test)
-  data/                      base de datos y secreto local (IGNORADO por git)
+  test/*.test.js             pruebas automáticas (npm test); test/helpers/mysql.js recrea bases *_test
+  data/                      base SQLite y secreto local (IGNORADO por git)
   .env.example               plantilla de variables de entorno
 docs/AVANCES_SURF_SALVAJE.md este documento
 ```
@@ -91,7 +92,30 @@ docs/AVANCES_SURF_SALVAJE.md este documento
 
 ## 6. Base de datos
 
-SQLite en `servidor/data/surf-salvaje.db` (`DATABASE_URL`). Tablas (migración `001_accounts_economy.sql`):
+**IMPLEMENTADO · PROBADO en MySQL/MariaDB (MariaDB 10.11) y en SQLite.**
+
+El motor se elige con `DATABASE_URL` en `servidor/.env`:
+
+| `DATABASE_URL` | Motor |
+|---|---|
+| `mysql://usuario:contraseña@localhost:3306/surf_salvaje` | **MySQL 5.7+/8 o MariaDB 10.3+** (p. ej. aaPanel). Recomendado en el VPS. |
+| `file:./data/surf-salvaje.db` (o sin definir) | SQLite en `servidor/data/` (desarrollo local). |
+
+- **No hay que importar ningún `.sql`**: al arrancar, el servidor crea o actualiza las tablas con las migraciones de su motor (`servidor/migrations/mysql/` o `servidor/migrations/sqlite/`) y las anota en `schema_migrations`.
+- Si la contraseña tiene símbolos, van codificados en la URL: `@`→`%40`, `:`→`%3A`, `/`→`%2F`, `#`→`%23`, `?`→`%3F` (probado).
+- Al arrancar, el servidor muestra `Base de datos: MySQL mysql://usuario:***@...` (sin la contraseña).
+- MySQL: InnoDB, utf8mb4, fechas `DATETIME(3)` en UTC, saldos `BIGINT` con `CHECK (balance >= 0)` y claves foráneas. Cada operación de dinero es una transacción real que **bloquea la fila del monedero (`SELECT ... FOR UPDATE`)**: compras o conversiones simultáneas no pueden gastar el mismo saldo (probado con peticiones en paralelo).
+- Conexiones: un pool de `DATABASE_POOL` (10 por defecto).
+
+### Puesta en marcha en aaPanel (VPS)
+1. *aaPanel → Databases → Add database*: nombre `surf_salvaje`, usuario y contraseña, acceso **Local server**. Charset utf8mb4.
+2. *App Store → Node.js version manager*: instala **Node.js 22.13 o superior**.
+3. Sube `client/` y `servidor/` (sin `node_modules` ni `servidor/data/`), por ejemplo a `/www/wwwroot/surf/`, y ejecuta `npm install` en `servidor/`.
+4. Crea `servidor/.env` a partir de `.env.example` con `DATABASE_URL=mysql://usuario:contraseña@localhost:3306/surf_salvaje`, `PUBLIC_URL=https://tu-dominio`, `NODE_ENV=production`, `SESSION_SECRET` y las credenciales de Google y Discord.
+5. *Website → Node project → Add*: ruta `/www/wwwroot/surf/servidor`, arranque `npm start`, puerto `3000`. Asocia el dominio y activa **SSL**. El proxy debe dejar pasar los **WebSockets** (`/play`, `/lobby`).
+6. Arranca y comprueba el log: `Base de datos: MySQL ...`. Las tablas aparecerán en phpMyAdmin.
+7. Copias de seguridad: *Databases → Backup* (programable en *Cron*).
+8. Si ya tenías cuentas en SQLite, no se pasan solas a MySQL (hoy no hay herramienta de traspaso). En una instalación nueva no hace falta.
 
 | Tabla | Para qué |
 |---|---|
@@ -114,8 +138,9 @@ Todas las cantidades son **INTEGER**; nunca coma flotante.
 
 ## 7. Migraciones
 
-- `servidor/migrations/NNN_nombre.sql`, aplicadas en orden por `db.js` y anotadas en `schema_migrations`. Nunca se reaplican.
-- **Regla:** no editar una migración ya aplicada. Para cambiar el esquema se crea `002_...sql`. Prohibido `DROP TABLE` sobre datos reales.
+- Una carpeta por motor: `servidor/migrations/mysql/NNN_nombre.sql` y `servidor/migrations/sqlite/NNN_nombre.sql`, con el **mismo nombre** y el mismo modelo. Se aplican en orden por `db.js` y se anotan en `schema_migrations`. Nunca se reaplican.
+- **Regla:** no editar una migración ya aplicada. Para cambiar el esquema se crea `002_...sql` **en las dos carpetas**. Prohibido `DROP TABLE` sobre datos reales.
+- En MySQL el DDL no es transaccional: las migraciones usan `CREATE TABLE IF NOT EXISTS` para poder relanzarse si algo se corta.
 - El catálogo (`shop_items`), los paquetes y los productos se **sincronizan** en cada arranque desde `config/economy.json` y el catálogo compartido. Lo que desaparece se marca como no disponible; no se borra.
 
 ## 8. Login Google
@@ -268,6 +293,11 @@ Paquetes en `config/economy.json → exchangePackages`: Pequeño 500, Mediano 1.
 - `servidor/test/economy.test.js`, `servidor/test/auth-flow.test.js`
 - `docs/AVANCES_SURF_SALVAJE.md`, `CLAUDE.md`
 
+### Fase 1b · MySQL/MariaDB (2026-09-27)
+- Modificados: `servidor/src/db.js` (capa dual), `economy.js`, `auth.js`, `api.js`, `index.js`, `scripts/admin-economy.mjs` (todo asíncrono), `package.json` (`mysql2`), `.env.example`, `README.md`, `test/economy.test.js`, `test/auth-flow.test.js`.
+- Movido: `migrations/001_accounts_economy.sql` → `migrations/sqlite/001_accounts_economy.sql` (mismo contenido y nombre).
+- Creados: `servidor/migrations/mysql/001_accounts_economy.sql`, `servidor/test/helpers/mysql.js`.
+
 ## 23. Problemas encontrados
 
 1. No había backend de datos ni cuentas: el equipo vivía solo en `localStorage`.
@@ -276,7 +306,10 @@ Paquetes en `config/economy.json → exchangePackages`: Pequeño 500, Mediano 1.
 4. El límite de peticiones frenó las pruebas de login encadenadas desde la misma IP.
 5. Playwright no intercepta peticiones que vienen de una redirección (pruebas de los botones).
 6. `prompt=none` en Discord podía fallar con usuarios que nunca habían autorizado la app.
-7. Previos a esta fase y sin tocar: `scripts/verify-layout.mjs` falla (espera solo `client` y `servidor` en la raíz) y `scripts/verify-race-live.mjs` falla con el protocolo actual.
+7. La primera versión era síncrona (SQLite) y no servía para MySQL, cuyo acceso es asíncrono.
+8. Con MySQL y peticiones en paralelo, la comprobación "ya lo tiene" podía leerse antes de que se confirmara otra compra.
+9. SQLite tiene una sola conexión: con código asíncrono, una consulta suelta podía colarse dentro de una transacción ajena.
+10. Previos a esta fase y sin tocar: `scripts/verify-layout.mjs` falla (espera solo `client` y `servidor` en la raíz) y `scripts/verify-race-live.mjs` falla con el protocolo actual.
 
 ## 24. Soluciones implementadas
 
@@ -286,10 +319,18 @@ Paquetes en `config/economy.json → exchangePackages`: Pequeño 500, Mediano 1.
 4. Límites razonables para LAN y configurables con `RATE_LIMIT_*`.
 5. Las pruebas de botones registran la URL de la petición en lugar de esperar a que cargue la página.
 6. Discord sin `prompt`: siempre muestra la pantalla de consentimiento.
+7. Capa `db.js` con la misma interfaz asíncrona para los dos motores (get/all/run/upsert/tx) y migraciones por motor.
+8. Cada operación de dinero bloquea primero la fila del monedero (`FOR UPDATE`), y después lee: ya ve lo confirmado por la operación anterior.
+9. En SQLite, las transacciones se encolan y las consultas sueltas esperan a que no haya ninguna abierta.
 
 ## 25. Pruebas ejecutadas
 
-- `npm test` (servidor en marcha): **59/59**. Incluye:
+- **MySQL/MariaDB (MariaDB 10.11):** con `TEST_MYSQL_URL=mysql://usuario:clave@localhost:3306/surf_test`:
+  - `test/economy.test.js`: 16/16 (8 en SQLite y 8 en MariaDB, incluida concurrencia: 6 compras simultáneas → 1 cobro; mismo `requestId` ×5 → 1 cobro; 5 conversiones simultáneas con oro para 2 → 2; tope diario con llegadas simultáneas; orden pagada acreditada una vez aunque se procese dos veces a la vez).
+  - `test/auth-flow.test.js`: 3/3 con el servidor real sobre MariaDB.
+  - Servidor real sobre MariaDB + `npm test`: **60/60** y `test-cosmetics-sync-live` OK. En el navegador, compra real (2.500 → 2.200) comprobada en las tablas.
+  - Contraseña con símbolos codificados en `DATABASE_URL`: conecta.
+- `npm test` (servidor en marcha, SQLite): **60/60**. Incluye:
   - `test/economy.test.js` (7): saldos independientes, compra atómica, rechazo por saldo, doble compra, idempotencia, saldo nunca negativo (también por `CHECK`), oro que no compra artículos, conversión atómica, recompensas con tope, oro solo desde orden PAID y migración local sin regalos.
   - `test/auth-flow.test.js` (3): servidor real + **proveedor OAuth simulado** (RSA/JWKS/PKCE para Google, token/@me para Discord). Cubre cuenta nueva, cuenta existente, vinculación, login desde otro navegador a la misma cuenta, robo de identidad bloqueado, desvincular, logout, state reutilizado, otro navegador, `aud`/`nonce` falsos, CSRF/Origin, compra/conversión idempotentes, ajuste admin por CLI, pagos deshabilitados, webhook sin efecto y equipo autoritativo por WebSocket (cuenta e invitado).
 - `scripts/test-cosmetics-sync-live.mjs`: OK con 3 clientes.
@@ -316,6 +357,7 @@ Paquetes en `config/economy.json → exchangePackages`: Pequeño 500, Mediano 1.
 
 | Qué | Dónde | Estado |
 |---|---|---|
+| Base de datos MySQL + `DATABASE_URL` | aaPanel → Databases y `servidor/.env` | PENDIENTE (dueño, pasos en la sección 6) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` y redirect URI | Google Cloud Console | BLOQUEADO (dueño) |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` y redirect | Discord Developer Portal | BLOQUEADO (dueño) |
 | `PUBLIC_URL` con dominio https + `SESSION_SECRET` + `NODE_ENV=production` | Servidor de producción | BLOQUEADO (dueño) |
@@ -341,6 +383,11 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-27 · Fase 1b · Soporte MySQL/MariaDB (aaPanel)
+- `DATABASE_URL=mysql://...` usa MySQL/MariaDB; sin ella, SQLite. Las tablas se crean solas (migraciones por motor).
+- Toda la capa de cuentas y economía pasa a ser asíncrona, con transacciones reales y bloqueo de filas (`FOR UPDATE`) en las operaciones de dinero.
+- Probado en MariaDB 10.11 y SQLite: economía (con concurrencia), login completo con proveedor simulado, suite del juego y compra en el navegador.
 
 ### 2026-09-27 · Fase 1 de cuentas y economía
 Todo lo descrito arriba: login Google y Discord, cuentas, SQLite, dos monedas, monedero, inventario, compras, conversión, pagos preparados, perfil, menú según la referencia, tienda con precios y pruebas.

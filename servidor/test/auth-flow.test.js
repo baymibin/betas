@@ -12,6 +12,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {TYPE, read, states, profilePacket, roomRequest} from '../../client/src/shared/protocol.js';
+import {resetMysql} from './helpers/mysql.js';
 
 const serverDir = fileURLToPath(new URL('../', import.meta.url));
 const PORT = 3900 + Math.floor(Math.random() * 90), BASE = `http://localhost:${PORT}`;
@@ -59,7 +60,9 @@ before(async () => {
     itemPrices: {'wing:5': 300}, rewards: {enabled: false},
     exchangePackages: [{id: 'p500', name: 'Pequeño', normalAmount: 500, goldPrice: 50}], goldProducts: []
   }));
-  process.env.TEST_DB = 'file:' + join(dir, 'surf.db');
+  // Con TEST_MYSQL_URL el servidor real usa MySQL/MariaDB (base *_test recreada); si no, SQLite.
+  if (process.env.TEST_MYSQL_URL) await resetMysql(process.env.TEST_MYSQL_URL);
+  process.env.TEST_DB = process.env.TEST_MYSQL_URL || 'file:' + join(dir, 'surf.db');
   server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'src/index.js'], {cwd: serverDir, stdio: ['ignore', 'pipe', 'pipe'], env: {
     ...process.env, RATE_LIMIT_AUTH: '1000', PORT: String(PORT), PUBLIC_URL: BASE, SESSION_SECRET: 'x'.repeat(40), DATABASE_URL: process.env.TEST_DB, ECONOMY_CONFIG: join(dir, 'economy.json'),
     GOOGLE_CLIENT_ID: 'google-client', GOOGLE_CLIENT_SECRET: 'google-secret', GOOGLE_AUTH_URL: mockBase + '/google/auth',
