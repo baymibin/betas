@@ -47,4 +47,4 @@ Las herramientas antiguas de migración permanecen en `backups/migrations` como 
 Login con Google y Discord, monedas (Tablas Normales y Tablas de Oro), inventario y tienda con precios.
 Configuración: copia `.env.example` a `.env` y rellena las credenciales (ver `docs/AVANCES_SURF_SALVAJE.md`, secciones 8 y 9).
 Precios y recompensas: `config/economy.json`. Ajustes de saldo autorizados: `npm run admin -- users | grant | history`.
-La base de datos (SQLite) se crea sola en `servidor/data/` (no se sube a git). Requiere Node.js 22.13 o superior.
+Base de datos: MySQL/MariaDB con `DATABASE_URL=mysql://usuario:contraseña@localhost:3306/base` en `.env` (p. ej. la de aaPanel), o SQLite por defecto en `servidor/data/` (no se sube a git). En ambos casos las tablas se crean solas al arrancar. Requiere Node.js 22.13 o superior.

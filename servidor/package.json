@@ -8,6 +8,7 @@
     "admin": "node --disable-warning=ExperimentalWarning scripts/admin-economy.mjs"
   },
   "dependencies": {
+    "mysql2": "^3.24.4",
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.67.0"
   },
   "engines": {

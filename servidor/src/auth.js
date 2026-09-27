@@ -14,7 +14,7 @@ import {createHash, createHmac, randomBytes, createPublicKey, verify as verifySi
 import {readFileSync, writeFileSync, mkdirSync, existsSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {transaction} from './db.js';
+import {nowSql, isUniqueViolation} from './db.js';
 import {EconomyError} from './economy.js';
 
 const serverRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -64,23 +64,22 @@ export function authConfig(env = process.env) {
 export const providerEnabled = (config, provider) => !!(config[provider]?.clientId && config[provider]?.clientSecret);
 
 export function createAuth(db, economy, config, {fetch: http = globalThis.fetch} = {}) {
-  const q = sql => db.prepare(sql);
   const hmac = value => createHmac('sha256', config.secret).update(String(value)).digest('hex');
 
   // ---------- Sesiones ----------
-  function createSession(userId) {
+  async function createSession(userId) {
     const token = random(32), csrf = random(24);
-    q('INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at) VALUES (?, ?, ?, ?)').run(hmac(token), userId, csrf, Date.now() + SESSION_MS);
-    q('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+    await db.run('INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at) VALUES (?, ?, ?, ?)', [hmac(token), userId, csrf, Date.now() + SESSION_MS]);
+    await db.run('DELETE FROM sessions WHERE expires_at < ?', [Date.now()]);
     return token;
   }
-  function session(token) {
+  async function session(token) {
     if (!token || token.length > 100) return null;
-    const row = q('SELECT user_id AS userId, csrf_token AS csrf, expires_at AS expiresAt FROM sessions WHERE token_hash = ?').get(hmac(token));
-    if (!row || row.expiresAt < Date.now()) return null;
-    return {...row};
+    const row = await db.get('SELECT user_id AS userId, csrf_token AS csrf, expires_at AS expiresAt FROM sessions WHERE token_hash = ?', [hmac(token)]);
+    if (!row || Number(row.expiresAt) < Date.now()) return null;
+    return {...row, expiresAt: Number(row.expiresAt)};
   }
-  const destroySession = token => token && q('DELETE FROM sessions WHERE token_hash = ?').run(hmac(token));
+  const destroySession = async token => { if (token) await db.run('DELETE FROM sessions WHERE token_hash = ?', [hmac(token)]); };
   const sessionCookie = token => cookie(SESSION_COOKIE, token, {maxAge: SESSION_MS / 1000});
   const clearSessionCookie = () => cookie(SESSION_COOKIE, '', {maxAge: 0});
   function cookie(name, value, {maxAge, path = '/'} = {}) {
@@ -89,7 +88,7 @@ export function createAuth(db, economy, config, {fetch: http = globalThis.fetch}
 
   // ---------- Inicio del flujo ----------
   // Devuelve {location, cookies}. mode 'link' exige una sesión (currentUserId).
-  function start(provider, mode, currentUserId, browserToken) {
+  async function start(provider, mode, currentUserId, browserToken) {
     if (!['google', 'discord'].includes(provider)) throw new EconomyError('unknown_provider', 404);
     if (!providerEnabled(config, provider)) throw new EconomyError('provider_not_configured', 503);
     if (!['login', 'link'].includes(mode)) throw new EconomyError('invalid_mode');
@@ -97,9 +96,9 @@ export function createAuth(db, economy, config, {fetch: http = globalThis.fetch}
     const cookies = [];
     if (!browserToken) { browserToken = random(24); cookies.push(cookie(BROWSER_COOKIE, browserToken, {maxAge: STATE_MS / 1000, path: '/auth'})); }
     const state = random(32), verifier = random(48), nonce = random(24);
-    q('DELETE FROM oauth_states WHERE expires_at < ?').run(Date.now());
-    q('INSERT INTO oauth_states (state_hash, provider, mode, link_user_id, code_verifier, nonce, browser_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(hmac(state), provider, mode, mode === 'link' ? currentUserId : null, verifier, nonce, hmac(browserToken), Date.now() + STATE_MS);
+    await db.run('DELETE FROM oauth_states WHERE expires_at < ?', [Date.now()]);
+    await db.run('INSERT INTO oauth_states (state_hash, provider, mode, link_user_id, code_verifier, nonce, browser_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [hmac(state), provider, mode, mode === 'link' ? currentUserId : null, verifier, nonce, hmac(browserToken), Date.now() + STATE_MS]);
     const p = config[provider], url = new URL(p.authUrl);
     const params = {client_id: p.clientId, redirect_uri: p.redirectUri, response_type: 'code', state};
     if (provider === 'google') Object.assign(params, {scope: 'openid profile', nonce, code_challenge: b64url(createHash('sha256').update(verifier).digest()), code_challenge_method: 'S256', prompt: 'select_account'});
@@ -115,20 +114,20 @@ export function createAuth(db, economy, config, {fetch: http = globalThis.fetch}
     const state = String(query.state || ''), code = String(query.code || '');
     if (!state || !code || state.length > 200 || code.length > 2000) throw new EconomyError('invalid_callback');
     // El state se consume aquí (un solo uso) antes de cualquier llamada externa.
-    const flow = transaction(db, () => {
-      const row = q('SELECT * FROM oauth_states WHERE state_hash = ?').get(hmac(state));
-      if (row) q('DELETE FROM oauth_states WHERE state_hash = ?').run(hmac(state));
+    const flow = await db.tx(async t => {
+      const row = await t.get('SELECT * FROM oauth_states WHERE state_hash = ?' + t.forUpdate, [hmac(state)]);
+      if (row) await t.run('DELETE FROM oauth_states WHERE state_hash = ?', [hmac(state)]);
       return row && {...row};
     });
-    if (!flow || flow.provider !== provider || flow.expires_at < Date.now()) throw new EconomyError('invalid_state', 400);
+    if (!flow || flow.provider !== provider || Number(flow.expires_at) < Date.now()) throw new EconomyError('invalid_state', 400);
     if (!browserToken || hmac(browserToken) !== flow.browser_hash) throw new EconomyError('state_browser_mismatch', 400);
     const identity = provider === 'google' ? await googleIdentity(code, flow) : await discordIdentity(code);
     if (flow.mode === 'link') {
       if (!currentUserId || currentUserId !== flow.link_user_id) throw new EconomyError('login_required', 401);
-      linkIdentity(currentUserId, identity);
+      await linkIdentity(currentUserId, identity);
       return {userId: currentUserId, mode: 'link', created: false};
     }
-    return {...loginIdentity(identity), mode: 'login'};
+    return {...await loginIdentity(identity), mode: 'login'};
   }
 
   async function postForm(url, form) {
@@ -184,41 +183,52 @@ export function createAuth(db, economy, config, {fetch: http = globalThis.fetch}
   }
 
   // ---------- Cuentas e identidades ----------
-  const identityOwner = ({provider, subject}) => q('SELECT user_id FROM auth_identities WHERE provider = ? AND subject = ?').get(provider, subject)?.user_id || null;
-  function touchIdentity({provider, subject, displayName, avatarUrl}) {
-    q("UPDATE auth_identities SET display_name = ?, avatar_url = ?, last_login_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE provider = ? AND subject = ?").run(displayName, avatarUrl, provider, subject);
+  const identityOwner = async ({provider, subject}, r = db) => (await r.get('SELECT user_id FROM auth_identities WHERE provider = ? AND subject = ?' + (r.forUpdate || ''), [provider, subject]))?.user_id || null;
+  async function touchIdentity({provider, subject, displayName, avatarUrl}, r = db) {
+    await r.run('UPDATE auth_identities SET display_name = ?, avatar_url = ?, last_login_at = ? WHERE provider = ? AND subject = ?', [displayName, avatarUrl, nowSql(), provider, subject]);
   }
-  function loginIdentity(identity) {
-    return transaction(db, () => {
-      const existing = identityOwner(identity);
-      if (existing) { touchIdentity(identity); return {userId: existing, created: false}; }
-      const userId = economy.createUser({nickname: identity.displayName, avatarUrl: identity.avatarUrl});
-      q("INSERT INTO auth_identities (user_id, provider, subject, display_name, avatar_url, last_login_at) VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))")
-        .run(userId, identity.provider, identity.subject, identity.displayName, identity.avatarUrl);
-      return {userId, created: true};
-    });
+  async function loginIdentity(identity) {
+    try {
+      return await db.tx(async t => {
+        const existing = await identityOwner(identity, t);
+        if (existing) { await touchIdentity(identity, t); return {userId: existing, created: false}; }
+        const userId = await economy.createUser({nickname: identity.displayName, avatarUrl: identity.avatarUrl}, t);
+        await t.run('INSERT INTO auth_identities (user_id, provider, subject, display_name, avatar_url, last_login_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [userId, identity.provider, identity.subject, identity.displayName, identity.avatarUrl, nowSql()]);
+        return {userId, created: true};
+      });
+    } catch (error) {
+      // Dos primeros logins simultáneos de la misma persona: gana uno y el otro entra en esa cuenta.
+      if (isUniqueViolation(error)) { const owner = await identityOwner(identity); if (owner) return {userId: owner, created: false}; }
+      throw error;
+    }
   }
-  function linkIdentity(userId, identity) {
-    transaction(db, () => {
-      const owner = identityOwner(identity);
-      if (owner === userId) { touchIdentity(identity); return; }
-      if (owner) throw new EconomyError('identity_in_use', 409);
-      if (q('SELECT 1 FROM auth_identities WHERE user_id = ? AND provider = ?').get(userId, identity.provider)) throw new EconomyError('provider_already_linked', 409);
-      q('INSERT INTO auth_identities (user_id, provider, subject, display_name, avatar_url) VALUES (?, ?, ?, ?, ?)')
-        .run(userId, identity.provider, identity.subject, identity.displayName, identity.avatarUrl);
-    });
+  async function linkIdentity(userId, identity) {
+    try {
+      await db.tx(async t => {
+        const owner = await identityOwner(identity, t);
+        if (owner === userId) { await touchIdentity(identity, t); return; }
+        if (owner) throw new EconomyError('identity_in_use', 409);
+        if (await t.get('SELECT 1 AS ok FROM auth_identities WHERE user_id = ? AND provider = ?', [userId, identity.provider])) throw new EconomyError('provider_already_linked', 409);
+        await t.run('INSERT INTO auth_identities (user_id, provider, subject, display_name, avatar_url) VALUES (?, ?, ?, ?, ?)',
+          [userId, identity.provider, identity.subject, identity.displayName, identity.avatarUrl]);
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new EconomyError('identity_in_use', 409);
+      throw error;
+    }
   }
   // Solo si queda otra forma de entrar: la cuenta nunca se queda inaccesible.
-  function unlink(userId, provider) {
-    return transaction(db, () => {
-      const list = identities(userId);
+  async function unlink(userId, provider) {
+    return db.tx(async t => {
+      const list = await t.all('SELECT provider FROM auth_identities WHERE user_id = ?' + t.forUpdate, [userId]);
       if (!list.some(i => i.provider === provider)) throw new EconomyError('not_linked', 404);
       if (list.length < 2) throw new EconomyError('last_identity', 409);
-      q('DELETE FROM auth_identities WHERE user_id = ? AND provider = ?').run(userId, provider);
-      return identities(userId);
+      await t.run('DELETE FROM auth_identities WHERE user_id = ? AND provider = ?', [userId, provider]);
+      return identities(userId, t);
     });
   }
-  const identities = userId => q('SELECT provider, display_name AS displayName, avatar_url AS avatarUrl, created_at AS linkedAt FROM auth_identities WHERE user_id = ? ORDER BY created_at').all(userId).map(r => ({...r}));
+  const identities = async (userId, r = db) => r.all('SELECT provider, display_name AS displayName, avatar_url AS avatarUrl, created_at AS linkedAt FROM auth_identities WHERE user_id = ? ORDER BY created_at', [userId]);
 
   return {createSession, session, destroySession, sessionCookie, clearSessionCookie, start, callback, identities, unlink,
     loginIdentity, linkIdentity, verifyGoogleIdToken, enabled: provider => providerEnabled(config, provider)};
