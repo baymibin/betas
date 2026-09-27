@@ -14,7 +14,7 @@ Practica y Online comparten simulacion a 30 Hz y recorrido. No aparecen rocas, a
 uWebSockets.js, salas de ocho jugadores, snapshots a 30 Hz y protocolo binario v7: ArrayBuffer, DataView, Little-Endian. El impulso se serializa y reconcilia con la posicion y velocidad vertical. Prediccion local e interpolacion remota.
 
 ## Pendiente antes de beta
-Carreras con salida y meta compartidas, reconexion con sesion, pruebas de carga y dispositivos moviles. El servidor procesa como maximo un input por jugador y tick; al faltar inputs el jugador se detiene. No hay cuentas ni clasificacion persistente. En produccion se requiere HTTPS/WSS. Babylon.js y fuentes aun se descargan desde proveedores externos.
+Carreras con salida y meta compartidas, reconexion con sesion, pruebas de carga y dispositivos moviles. El servidor aplica exactamente un input por jugador y tick desde una cola corta (ver seccion Cola de inputs). No hay cuentas ni clasificacion persistente. En produccion se requiere HTTPS/WSS. Babylon.js y fuentes aun se descargan desde proveedores externos.
 
 Los archivos antiguos de sprites se conservan como respaldo; no se sirven ni se importan.
 
@@ -45,3 +45,8 @@ Ocho habilidades: Tiki (8 s), Ola cohete (3 s), Coco buscador, Remolino, Pulso d
 Cada sala comparte una semilla uint32 que produce 48 cajas individuales, incluidas cajas elevadas tras rampas. El servidor decide recogidas, objetivos e impactos. POWER_WORLD: cabecera de 20 bytes, ids recogidos uint8 y entidades de 32 bytes. SNAPSHOT: cabecera de 14 bytes y 108 bytes por jugador; temporizadores uint16 y objetivo de estela uint32. Todo multibyte es Little-Endian. Recargar clientes al cambiar version.
 Velocidad base 16, turbo manual 34, turbo de habilidad 38 unidades/s. Efectos con un GlowLayer compartido; Tiki modifica la emision del avatar, sin esfera desplazada. Efectos extra desactivados en calidad baja. PNG originales en `assets/power-*.png` y marco en `assets/hud-surf-frame.png`.
 Pruebas: `npm test`, `node scripts/verify-powerups-live.mjs`, `node scripts/verify-race-live.mjs`, `node scripts/verify-capacity-live.mjs` (servidor iniciado).
+
+
+## Cola de inputs (septiembre 2026)
+El servidor guarda los INPUT de cada jugador en una cola (`src/input-queue.js`) y aplica uno por tick, igual que la prediccion del cliente. Si la red retrasa un input, repite el ultimo eje y los botones mantenidos (nunca saltar ni usar habilidad) y anota un tick debido; esa deuda deja hasta 2 inputs de colchon ante el siguiente retraso y solo se salda si se acumulan mas. Nunca se avanza mas de una vez por tick. Sin inputs durante 500 ms el eje vuelve a 0.
+Prueba con 8 humanos simulados: `node scripts/verify-inputs-live.mjs` (variables PORT, JITTER, SECONDS).
