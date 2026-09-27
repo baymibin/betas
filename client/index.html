@@ -1,0 +1,404 @@
+﻿<!DOCTYPE html>
+<html lang="es" class="surf-preloading">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Surf Salvaje</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8F%84%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sea-deep:#06364a;
+    --sea-mid:#1f8fa8;
+    --foam:#eafaf6;
+    --sand:#e8cf9c;
+    --cream:#f3f7f2;
+    --gold:#ffd15c;
+    --coral:#ff6b4a;
+    --ink:#0a2a33;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:#4fc3d8;
+    font-family:'Baloo 2', sans-serif;
+    color:var(--cream);
+    -webkit-tap-highlight-color: transparent;
+    user-select:none;
+  }
+  #canvas-wrap{ position:fixed; inset:0; }
+  #render-canvas{ width:100%; height:100%; display:block; outline:none; touch-action:none; }
+
+  /* ---------------- HUD ---------------- */
+  #hud{
+    position:fixed; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding: 14px 16px;
+    pointer-events:none;
+    z-index:10;
+    gap:12px;
+  }
+  .hud-left{ display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+  .pill{
+    background: linear-gradient(180deg, rgba(6,54,74,0.62), rgba(6,54,74,0.42));
+    border: 2px solid rgba(255,209,92,0.55);
+    border-radius: 15px;
+    padding: 6px 15px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 5px 16px rgba(0,20,30,0.28), inset 0 1px 0 rgba(255,255,255,0.18);
+    white-space:nowrap;
+  }
+  #score-pill{ font-size: 17px; font-weight:700; letter-spacing:0.3px; }
+  #score-pill span{ color: var(--gold); font-weight:800; }
+  #coins-pill{ font-size: 15px; font-weight:700; display:flex; align-items:center; gap:7px; }
+  .pearl-dot{
+    width:14px; height:14px; border-radius:50%;
+    background: radial-gradient(circle at 34% 28%, #ffffff, #cdf1f2 52%, #6fb8bf 100%);
+    display:inline-block;
+    box-shadow: 0 0 6px rgba(255,255,255,0.85);
+  }
+
+  /* boost meter */
+  #boost-wrap{
+    display:flex; align-items:center; gap:8px;
+    background: linear-gradient(180deg, rgba(6,54,74,0.62), rgba(6,54,74,0.42));
+    border:2px solid rgba(255,209,92,0.4);
+    border-radius: 999px;
+    padding: 5px 12px 5px 10px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 5px 16px rgba(0,20,30,0.28);
+  }
+  #boost-label{ font-size:11px; font-weight:800; letter-spacing:1px; color:rgba(255,209,92,0.95); }
+  #boost-bar{
+    width: 118px; height:11px; border-radius:999px;
+    background: rgba(4,32,44,0.75);
+    overflow:hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+  }
+  #boost-fill{
+    height:100%; width:0%;
+    border-radius:999px;
+    background: linear-gradient(90deg, #35d0e0, #ffd15c 70%, #ff8a3d);
+    transition: width 0.08s linear;
+    box-shadow: 0 0 10px rgba(255,209,92,0.6);
+  }
+  #boost-wrap.full #boost-bar{ animation: boostPulse 0.75s ease-in-out infinite; }
+  @keyframes boostPulse{
+    0%,100%{ box-shadow: inset 0 1px 3px rgba(0,0,0,0.5), 0 0 0 rgba(255,209,92,0); }
+    50%{ box-shadow: inset 0 1px 3px rgba(0,0,0,0.5), 0 0 14px rgba(255,209,92,0.95); }
+  }
+
+  /* minimap */
+  #minimap{
+    width: 108px; height:108px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,209,92,0.85);
+    background: radial-gradient(circle at 50% 50%, #1f8fa8 0%, #06364a 78%);
+    position:relative;
+    overflow:hidden;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 0 20px rgba(0,0,0,0.35);
+    flex: 0 0 auto;
+  }
+  #minimap canvas{ width:100%; height:100%; display:block; }
+  #minimap-label{
+    position:absolute; bottom:3px; left:0; right:0;
+    text-align:center; font-size:9px; font-weight:700;
+    color:rgba(243,247,242,0.72);
+    letter-spacing:0.6px; text-shadow:0 1px 3px #000;
+  }
+
+  /* trick popup */
+  #trick{
+    position:fixed; top: 26%; left:0; right:0;
+    text-align:center; z-index:12; pointer-events:none;
+    font-size: 44px; font-weight:800; letter-spacing:1px;
+    color: var(--gold);
+    text-shadow: 0 3px 0 #a87413, 0 0 26px rgba(255,209,92,0.85), 0 6px 22px rgba(0,0,0,0.5);
+    opacity:0; transform: scale(0.6) rotate(-6deg);
+  }
+  #trick.show{ animation: trickPop 1.15s cubic-bezier(.18,.9,.3,1) forwards; }
+  @keyframes trickPop{
+    0%   { opacity:0; transform: scale(0.55) rotate(-8deg); }
+    18%  { opacity:1; transform: scale(1.14) rotate(2deg); }
+    34%  { transform: scale(1.0) rotate(0deg); }
+    72%  { opacity:1; transform: scale(1.0) translateY(-6px); }
+    100% { opacity:0; transform: scale(1.05) translateY(-46px); }
+  }
+
+  /* speed lines vignette while boosting */
+  #boost-vignette{
+    position:fixed; inset:0; z-index:8; pointer-events:none; opacity:0;
+    transition: opacity 0.22s ease;
+    background: radial-gradient(ellipse at 50% 58%, rgba(255,255,255,0) 34%, rgba(180,240,255,0.16) 62%, rgba(20,90,120,0.42) 100%);
+  }
+  #boost-vignette.on{ opacity:1; }
+
+  #controls-hint{
+    position:fixed; bottom: 12px; left:0; right:0; text-align:center;
+    font-size: 12.5px; font-weight:600; color: rgba(255,255,255,0.82); z-index: 10; pointer-events:none;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.6);
+    padding: 0 14px;
+  }
+  #controls-hint b{ color: var(--gold); }
+
+  #boost-btn{
+    position:fixed; right: 16px; bottom: 58px; z-index: 11;
+    width: 82px; height:82px; border-radius:50%;
+    display:none; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; letter-spacing:0.5px;
+    color:#0a2a33;
+    background: linear-gradient(180deg, #7fe8f5, #2bb6cf);
+    border: 3px solid rgba(255,255,255,0.85);
+    box-shadow: 0 6px 0 #14707f, 0 10px 22px rgba(0,0,0,0.4);
+    pointer-events:auto; touch-action:none;
+  }
+  #boost-btn:active{ transform: translateY(4px); box-shadow: 0 2px 0 #14707f; }
+  body.touch #boost-btn{ display:flex; }
+
+  /* ---------------- Overlay ---------------- */
+  #overlay{
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(180deg, rgba(12,110,140,0.42), rgba(4,26,36,0.88));
+    z-index:20;
+    padding: 18px;
+  }
+  #overlay.hidden{ display:none; }
+  .panel{
+    text-align:center;
+    max-width: 380px;
+    width:100%;
+    padding: 30px 28px 26px;
+    background: linear-gradient(180deg, rgba(11,84,104,0.94), rgba(5,38,50,0.97));
+    border: 2.5px solid rgba(255,209,92,0.5);
+    border-radius: 26px;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.14);
+  }
+  .badge{
+    display:inline-block; font-size:11px; font-weight:800; letter-spacing:2.2px;
+    color:#06364a; background: linear-gradient(180deg,#ffd15c,#e6a621);
+    padding: 4px 14px; border-radius:999px; margin-bottom:12px;
+    box-shadow: 0 3px 0 #a87413;
+  }
+  .panel h1{
+    margin: 0 0 8px;
+    font-size: 33px; font-weight:800; line-height:1.05;
+    color: var(--cream);
+    text-shadow: 0 3px 0 rgba(0,0,0,0.3), 0 0 30px rgba(255,209,92,0.25);
+  }
+  .panel h1 em{ font-style:normal; color: var(--gold); }
+  .panel p{
+    margin: 0 0 18px;
+    font-size: 14.5px; line-height:1.5;
+    color: rgba(243,247,242,0.86);
+  }
+  .keys{
+    display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-bottom:20px;
+  }
+  .keys span{
+    font-size:11.5px; font-weight:700; color:rgba(243,247,242,0.9);
+    background: rgba(4,32,44,0.6);
+    border:1.5px solid rgba(255,209,92,0.32);
+    border-radius:9px; padding: 5px 9px;
+  }
+  .stat-row{ display:flex; justify-content:center; gap: 26px; margin-bottom: 20px; }
+  .stat-row div{ text-align:center; }
+  .stat-num{ font-size: 27px; font-weight:800; color: var(--gold); line-height:1.1; }
+  .stat-label{ font-size: 11px; font-weight:600; color: rgba(243,247,242,0.7); letter-spacing:0.4px; }
+  button.cta{
+    font-family:'Baloo 2', sans-serif;
+    font-size: 19px; font-weight: 800; letter-spacing:0.4px;
+    padding: 14px 38px;
+    border-radius: 999px; border:none;
+    background: linear-gradient(180deg, #ffd15c, #e6a621);
+    color: #3a2408;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #a87413, 0 12px 24px rgba(0,0,0,0.35);
+  }
+  button.cta:active{ transform: translateY(4px); box-shadow: 0 2px 0 #a87413; }
+  .best{ margin-top:14px; font-size:12px; font-weight:700; color: rgba(255,209,92,0.8); }
+
+  /* ---------- Pantalla de carga (solo CSS/SVG en línea: aparece al instante) ---------- */
+  #loading{
+    position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+    padding:24px; box-sizing:border-box; color:#eafaf6;
+    background:
+      radial-gradient(120% 90% at 50% 110%, rgba(47,214,228,.28), transparent 60%),
+      radial-gradient(90% 70% at 20% 0%, rgba(92,232,240,.16), transparent 60%),
+      linear-gradient(160deg,#0a4d63,#06283a 60%,#041c29);
+    transition: opacity .55s ease;
+  }
+  #loading.gone{ opacity:0; pointer-events:none; }
+  #loading.bg-ready{ background:
+      radial-gradient(120% 90% at 50% 110%, rgba(47,214,228,.28), transparent 60%),
+      linear-gradient(180deg, rgba(4,30,44,.7), rgba(3,24,36,.88)),
+      url('/assets/images/shop/shop-bg-tropical.webp') center/cover,
+      linear-gradient(160deg,#0a4d63,#06283a 60%,#041c29); }
+  /* Mientras el Service Worker toma el control no se piden imágenes del menú
+     (evita descargarlas dos veces en la primera visita). El preloader quita la clase. */
+  html.surf-preloading #overlay.surf-home{ background-image:none !important; }
+  .loading-card{
+    width:min(560px,100%); box-sizing:border-box; padding:34px 36px 30px; text-align:center;
+    border-radius:30px; border:1px solid #b8f3ff78;
+    background:linear-gradient(160deg,rgba(8,54,72,.86),rgba(4,34,50,.9));
+    box-shadow:0 26px 90px #00131dbb, inset 0 0 0 1px #ffffff25;
+    backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+  }
+  .loading-wave{ width:64px; height:44px; margin:0 auto 6px; display:block; animation:loading-bob 2.4s ease-in-out infinite; }
+  @keyframes loading-bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-5px) } }
+  .loading-kicker{ display:block; font-size:11px; font-weight:900; letter-spacing:2.4px; color:#5ce8f0; }
+  .loading-title{ margin:6px 0 2px; font-size:clamp(34px,7vw,48px); font-weight:800; line-height:1; letter-spacing:-1px; color:#fff; text-shadow:0 3px 12px #001b24bb; }
+  .loading-sub{ margin:6px 0 24px; font-size:15px; font-weight:600; color:#b9d9e3; }
+  .loading-track{ position:relative; height:16px; border-radius:999px; overflow:hidden; background:rgba(1,20,32,.85); border:1px solid rgba(140,232,245,.4); box-shadow:inset 0 2px 6px rgba(0,0,0,.35); }
+  #loading-bar-fill{ position:absolute; inset:0; transform-origin:left center; transform:scaleX(0);
+    background:linear-gradient(90deg,#2fd6e4,#5ce8f0 45%,#ffe07a 85%,#ffc53f); box-shadow:0 0 14px rgba(92,232,240,.55); }
+  .loading-meta{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:12px; font-size:14px; font-weight:700; }
+  #loading-status{ color:#cfe9f0; text-align:left; min-height:1.3em; }
+  #loading-percent{ color:#ffd257; font-variant-numeric:tabular-nums; font-size:16px; font-weight:800; }
+  #loading-error{ display:none; margin-top:20px; }
+  #loading.has-error #loading-error{ display:block; }
+  #loading.has-error .loading-track, #loading.has-error .loading-meta{ opacity:.35; }
+  #loading-error strong{ display:block; font-size:19px; color:#fff; margin-bottom:4px; }
+  #loading-error-list{ margin:0 0 14px; font-size:12px; color:#9fc3cd; word-break:break-word; }
+  #loading-retry{ height:46px; padding:0 26px; border-radius:14px; border:1px solid #ffe9a0; cursor:pointer;
+    background:linear-gradient(180deg,#ffe07a,#ffc53f); color:#13262d; font:inherit; font-size:16px; font-weight:800; box-shadow:0 0 18px rgba(255,200,60,.45); }
+  @media (max-width:540px){ .loading-card{ padding:26px 20px 22px; border-radius:24px; } .loading-sub{ font-size:13px; margin-bottom:18px; } .loading-meta{ font-size:12px; } }
+  @media (prefers-reduced-motion: reduce){ .loading-wave{ animation:none; } }
+  #fatal{
+    display:none; position:fixed; inset:0; z-index:50; padding:30px;
+    background:#20120c; color:#ffd9c9; font-size:15px; line-height:1.6;
+    align-items:center; justify-content:center; text-align:center;
+  }
+</style>
+<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css">
+</head>
+<body>
+<div id="loading" role="status" aria-live="polite" aria-busy="true">
+  <div class="loading-card">
+    <svg class="loading-wave" viewBox="0 0 64 44" aria-hidden="true"><path d="M4 38c6-15 16-30 32-32 11-1.4 20 6 19 15-.8 7-9 10-14 6-3.5-2.8-2-8.5 3-8-2-4.5-9.5-5-14 .6C25 26 26 34 33 40H8c-2.6 0-4.6-.8-4-2z" fill="#5ce8f0"/><path d="M30 19.6c4.5-5.6 12-5.1 14-.6-5-.5-6.5 5.2-3 8-4.4-.7-8.2-4.3-11-7.4z" fill="#fff"/></svg>
+    <span class="loading-kicker">MULTIJUGADOR · BAHÍA CORAL</span>
+    <h1 class="loading-title">SURF SALVAJE 🌊</h1>
+    <p class="loading-sub">Preparando tu próxima ola...</p>
+    <div class="loading-track" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100"><div id="loading-bar-fill"></div></div>
+    <div class="loading-meta"><span id="loading-status">Buscando la próxima ola...</span><span id="loading-percent">0%</span></div>
+    <div id="loading-error" role="alert">
+      <strong>No pudimos preparar tu próxima ola.</strong>
+      <p id="loading-error-list"></p>
+      <button id="loading-retry" type="button">Reintentar carga</button>
+    </div>
+  </div>
+</div>
+<noscript><p style="position:fixed;inset:auto 0 20px;z-index:60;text-align:center;color:#fff">Surf Salvaje necesita JavaScript para funcionar.</p></noscript>
+<div id="network-status">PRÁCTICA · SIN CONEXIÓN</div>
+
+<div id="canvas-wrap"><canvas id="render-canvas" touch-action="none"></canvas></div>
+
+<div id="boost-vignette"></div>
+
+<div id="hud">
+  <div class="hud-left">
+    <div id="score-pill" class="pill">Distancia <span id="score-val">0</span> m</div>
+    <div id="coins-pill" class="pill"><span id="coins-val">0</span> km/h</div>
+    <div id="boost-wrap">
+      <span id="boost-label">TURBO</span>
+      <div id="boost-bar"><div id="boost-fill"></div></div>
+    </div>
+  </div>
+  <div id="minimap">
+    <canvas id="minimap-canvas" width="216" height="216"></canvas>
+    <div id="minimap-label">SURF SALVAJE</div>
+  </div>
+</div>
+
+<div id="trick"></div>
+<div id="boost-btn">TURBO</div>
+
+<div id="controls-hint">
+  <b>Ratón / ← →</b> dirigir &nbsp;·&nbsp; <b>Espacio</b> saltar &nbsp;·&nbsp; <b>W / ↑</b> acelerar &nbsp;·&nbsp; <b>Shift</b> turbo &nbsp;·&nbsp; <b>E</b> habilidad &nbsp;·&nbsp; <b>ESC</b> pausa &nbsp;·&nbsp; <b>Clic derecho sostenido</b> mirar atrás &nbsp;|&nbsp; móvil: desliza y usa el botón TURBO
+</div>
+
+<div id="overlay" class="surf-home">
+ <nav class="home-nav" aria-label="Menu principal">
+  <a class="home-brand" href="#" aria-label="Surf Salvaje inicio">SS<span>SURF CLUB</span></a>
+  <button id="home-battle" class="nav-item selected" aria-current="page"><img data-src="/assets/images/menu/menu-wave.png" alt=""><span>Jugar</span></button>
+  <button id="home-profile" class="nav-item"><img data-src="/assets/images/menu/menu-profile.png" alt=""><span>Perfil</span></button>
+  <button id="shop-btn" class="nav-item"><img data-src="/assets/images/menu/menu-shop.png" alt=""><span>Tienda</span></button>
+  <button id="home-rooms" class="nav-item"><img data-src="/assets/images/menu/menu-rooms.png" alt=""><span>Salas</span></button>
+  <button id="home-settings" class="nav-item settings-nav"><span class="gear" aria-hidden="true">⚙</span><span>Ajustes</span></button>
+ </nav>
+ <main class="home-main">
+  <header class="home-top"><span class="home-tag">EL OCÉANO ES TU PISTA</span><span class="home-online">MULTIJUGADOR · HASTA 8 SURFISTAS</span></header>
+  <section class="home-play" aria-label="Empezar a jugar">
+   <span class="home-eyebrow">SUBE A TU TABLA</span><h1>SURF<br><em>SALVAJE</em></h1>
+   <p>Tu estilo. Tu ola. Tu próxima victoria.</p>
+   <div class="play-box"><label for="nickname">TU NICK</label><input id="nickname" maxlength="16" placeholder="Nombre de surfer" autocomplete="off"><button id="start-btn">JUGAR <span aria-hidden="true">➜</span></button><button id="practice-btn">Practicar en solitario</button></div>
+   <div class="home-facts"><span><b>8</b> playas</span><span><b>3</b> vueltas</span><span><b>∞</b> estilo</span></div><div id="best-start" class="best" style="display:none"></div>
+  </section>
+  <footer class="home-bottom"><span>← → DIRIGIR &nbsp; W / ↑ ACELERAR &nbsp; SHIFT TURBO &nbsp; ESPACIO SALTAR &nbsp; E HABILIDAD &nbsp; ESC PAUSA</span><span>STICKMAN SURF RACING</span></footer>
+ </main>
+</div>
+<dialog id="profile-dialog" class="home-dialog"><button class="dialog-close" aria-label="Cerrar perfil">×</button><span class="home-eyebrow">TU IDENTIDAD EN EL AGUA</span><h2>Mi surfer</h2><div id="profile-preview"></div><h3 id="profile-name"></h3><p id="profile-style"></p><button id="profile-customize" class="home-action">Personalizar en la tienda</button><p class="dialog-note">Cambia tu nick en el inicio. Tu estilo se guarda en este navegador.</p></dialog>
+<dialog id="settings-dialog" class="home-dialog"><button class="dialog-close" aria-label="Cerrar ajustes">×</button><span class="home-eyebrow">A TU MANERA</span><h2>Ajustes</h2>
+<label class="setting-row" for="setting-sound">Sonido <input id="setting-sound" type="checkbox"></label>
+<section class="audio-settings" aria-labelledby="audio-settings-title"><h3 id="audio-settings-title">AJUSTES DE AUDIO</h3>
+<div class="volume-row"><label for="setting-volume">Volumen general</label><output id="setting-volume-value" for="setting-volume">0 %</output><input id="setting-volume" class="volume-slider" type="range" min="0" max="100" step="5"></div>
+<div class="volume-row"><label for="setting-music">Música</label><output id="setting-music-value" for="setting-music">0 %</output><input id="setting-music" class="volume-slider" type="range" min="0" max="100" step="5"></div>
+<div class="volume-row"><label for="setting-ambience">Ambiente</label><output id="setting-ambience-value" for="setting-ambience">0 %</output><input id="setting-ambience" class="volume-slider" type="range" min="0" max="100" step="5"></div>
+<div class="volume-row"><label for="setting-sfx">Efectos</label><output id="setting-sfx-value" for="setting-sfx">0 %</output><input id="setting-sfx" class="volume-slider" type="range" min="0" max="100" step="5"></div>
+</section>
+<label class="setting-row" for="setting-effects">Efectos visuales <input id="setting-effects" type="checkbox"></label>
+<label for="setting-quality">Calidad gráfica</label><select id="setting-quality"><option value="auto">Automática · se adapta a tu equipo</option><option value="high">Alta · PC potente</option><option value="low">Baja · mejor rendimiento</option></select>
+<p class="dialog-note">La calidad baja reduce la resolución, las sombras y el brillo. Los cambios se guardan automáticamente.</p><p id="settings-saved" role="status"></p></dialog>
+
+<div id="fatal"></div>
+<dialog id="pause-modal" class="pause-dialog">
+  <div class="pause-card">
+    <div class="pause-tag">CARRERA EN CURSO</div>
+    <h2 class="pause-title">PAUSA</h2>
+    <p class="pause-desc">¿Deseas continuar la carrera o volver al menú principal?</p>
+    <div class="pause-btns">
+      <button id="pause-resume-btn" type="button" class="pause-btn resume">REANUDAR</button>
+      <button id="pause-quit-btn" type="button" class="pause-btn quit">SALIR AL MENÚ</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="shop-dialog" aria-labelledby="shop-title">
+  <div class="shop-shell">
+    <header class="shop-header">
+      <div><span class="shop-kicker">🌴 SURF CLUB · TODO GRATIS</span><h2 id="shop-title">La tiendita <span aria-hidden="true">🌊</span></h2><p>Tu estilo, tu ola. Elige y equipa.</p></div>
+      <button id="shop-close" type="button" aria-label="Cerrar tienda">×</button>
+    </header>
+    <div class="shop-layout">
+      <section class="shop-catalog" aria-label="Artículos de la tienda">
+        <div class="shop-tabs" role="tablist" aria-label="Categorías">
+          <button type="button" role="tab" data-category="character"><img data-src="/assets/images/shop/icon-character.webp" alt="">Personajes</button>
+          <button type="button" role="tab" data-category="board"><img data-src="/assets/images/shop/icon-board.webp" alt="">Tablas</button>
+          <button type="button" role="tab" data-category="wings"><img data-src="/assets/images/shop/icon-wings.webp" alt="">Wings</button>
+          <button type="button" role="tab" data-category="hats"><img data-src="/assets/images/shop/icon-hat.webp" alt="">Hats · Pronto</button>
+        </div>
+        <div id="shop-grid" role="tabpanel" aria-live="polite"></div>
+        <footer class="shop-footer">Sin monedas ni pagos · Tu equipo se guarda en este navegador.</footer>
+      </section>
+      <section class="shop-showcase" aria-label="Vista previa del surfista">
+        <div class="shop-stage"><canvas id="shop-preview-canvas" aria-label="Vista 3D del personaje con tabla y alas"></canvas><div class="shop-stage-hint">VISTA 3D · MUEVE PARA GIRAR</div></div>
+        <div class="shop-preview-tools" aria-label="Accesos rápidos">
+          <button type="button" data-category="character" aria-label="Ver personajes"><img data-src="/assets/images/shop/icon-character.webp" alt=""></button>
+          <button type="button" data-category="board" aria-label="Ver tablas"><img data-src="/assets/images/shop/icon-board.webp" alt=""></button>
+          <button type="button" data-category="wings" aria-label="Ver wings"><img data-src="/assets/images/shop/icon-wings.webp" alt=""></button>
+          <button type="button" data-category="hats" aria-label="Ver hats"><img data-src="/assets/images/shop/icon-hat.webp" alt=""></button>
+        </div>
+        <div class="shop-detail"><div><div class="shop-detail-heading"><strong id="shop-detail-name">Classic</strong><span id="shop-detail-rarity">COMÚN</span></div><p id="shop-detail-description">Un estilo atemporal. Siempre listo para la próxima ola.</p></div><button id="shop-detail-equip" type="button">EQUIPADO</button></div>
+      </section>
+    </div>
+  </div>
+</dialog>
+
+<!-- Babylon.js y el juego los carga el preloader con progreso real (manifiesto embebido por el servidor). -->
+<script src="/src/core/preloader.js"></script>
+</body>
+</html>
+
