@@ -274,7 +274,7 @@
     align-items:center; justify-content:center; text-align:center;
   }
 </style>
-<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css"><link rel="stylesheet" href="/styles/account.css">
+<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css"><link rel="stylesheet" href="/styles/account.css"><link rel="stylesheet" href="/styles/profile.css">
 </head>
 <body>
 <div id="loading" role="status" aria-live="polite" aria-busy="true">
@@ -371,7 +371,39 @@
   <footer class="home-bottom"><span>← → DIRIGIR &nbsp; W / ↑ ACELERAR &nbsp; SHIFT TURBO &nbsp; ESPACIO SALTAR &nbsp; E HABILIDAD &nbsp; ESC PAUSA</span><span>STICKMAN SURF RACING</span></footer>
  </main>
 </div>
-<dialog id="profile-dialog" class="home-dialog account-profile"><button class="dialog-close" aria-label="Cerrar perfil">×</button><span class="home-eyebrow">TU IDENTIDAD EN EL AGUA</span><h2>Mi surfer</h2><div id="profile-preview"></div><h3 id="profile-name"></h3><p id="profile-style"></p><div id="account-profile"></div><button id="profile-customize" class="home-action">Personalizar en la tienda</button><p class="dialog-note" id="profile-note">Cambia tu nick en el inicio. Tu estilo se guarda en este navegador.</p></dialog>
+<dialog id="profile-dialog" class="profile-dialog" aria-labelledby="profile-title">
+  <div class="profile-shell">
+    <button class="dialog-close profile-close" type="button" aria-label="Cerrar perfil">×</button>
+    <div class="profile-layout">
+      <section class="profile-left" aria-label="Tu surfer">
+        <span class="profile-kicker">TU IDENTIDAD EN EL AGUA</span>
+        <h2 id="profile-title" class="profile-title">Mi surfer <img src="/assets/images/menu/custom_ui/waveIcon.png" alt=""></h2>
+        <div class="profile-stage">
+          <canvas id="profile-preview-canvas" aria-label="Vista 3D de tu surfer con su tabla y alas"></canvas>
+          <div class="profile-identity"><h3 id="profile-name">Surfer</h3><p id="profile-style"></p></div>
+        </div>
+        <div class="profile-nick-card">
+          <img id="profile-avatar" class="profile-avatar" alt="" referrerpolicy="no-referrer">
+          <div class="profile-nick-main">
+            <div class="profile-nick-row">
+              <label class="profile-nick-field"><span class="sr-only">Nickname</span><input id="profile-nick" maxlength="16" autocomplete="off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.9V20h3.1L17 10.1 13.9 7 4 16.9Zm15.7-9.4a1 1 0 0 0 0-1.4l-1.8-1.8a1 1 0 0 0-1.4 0L15 5.8 18.2 9l1.5-1.5Z"/></svg></label>
+              <button id="profile-nick-save" type="button" class="profile-nick-save">Guardar nombre</button>
+            </div>
+            <small id="profile-id" class="profile-id" hidden></small>
+          </div>
+        </div>
+      </section>
+      <section class="profile-right" id="account-profile" aria-live="polite"></section>
+    </div>
+    <footer class="profile-footer">
+      <div class="profile-actions">
+        <button id="profile-customize" type="button" class="profile-shop-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5.2 4 4.8 2H1v2h2.2l3 11.3c.2.9 1 1.7 2 1.7H19v-2H8.3l-.3-1.2L19.6 13c.9-.1 1.6-.7 1.8-1.6L23 5H5.2Z"/></svg>Personalizar en la tienda</button>
+        <button id="profile-secondary" type="button" class="profile-secondary"></button>
+      </div>
+      <p id="profile-note" class="profile-note"></p>
+    </footer>
+  </div>
+</dialog>
 <dialog id="settings-dialog" class="home-dialog"><button class="dialog-close" aria-label="Cerrar ajustes">×</button><span class="home-eyebrow">A TU MANERA</span><h2>Ajustes</h2>
 <label class="setting-row" for="setting-sound">Sonido <input id="setting-sound" type="checkbox"></label>
 <section class="audio-settings" aria-labelledby="audio-settings-title"><h3 id="audio-settings-title">AJUSTES DE AUDIO</h3>

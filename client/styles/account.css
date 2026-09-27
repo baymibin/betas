@@ -118,25 +118,7 @@
 .coin-pack button:disabled{background:#ffffff1a;color:#cfe3e7;border-color:#ffffff33;cursor:not-allowed}
 .coin-pack.gold{border-color:#ffd25766}
 
-/* ---------- Perfil ---------- */
-#profile-dialog.account-profile{width:min(640px,94vw);max-height:90dvh;overflow:auto;text-align:left}
-.account-head{display:flex;gap:16px;align-items:center;margin:8px 0 14px}
-.account-head img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #5ce8f0;background:#0b4b5e}
-.account-head .account-id{font-size:11px;color:#9fc3cd;word-break:break-all}
-.account-nick{display:flex;gap:8px;margin:6px 0}
-.account-nick input{flex:1;min-width:0;padding:8px 12px;border-radius:10px;border:1px solid #ffffff40;background:#042a36;color:#fff;font:700 15px 'Baloo 2',sans-serif}
-.account-nick button,.account-section button{padding:8px 14px;border-radius:10px;border:1px solid #8feaf066;background:#0b4f62;color:#fff;font:700 13px 'Baloo 2',sans-serif;cursor:pointer}
-.account-section{margin:14px 0 0;padding:14px;border-radius:14px;background:#021e2d80;border:1px solid #8feaf033}
-.account-section h3{margin:0 0 10px;font-size:12px;letter-spacing:2px;color:#9ff4e6}
-.account-providers{display:grid;gap:8px}
-.account-provider{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px}
-.account-provider .linked{color:#aef4df;font-size:12px}
-.account-wallet{display:flex;gap:10px;flex-wrap:wrap}
-.account-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px;max-height:190px;overflow:auto}
-.account-list li{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border-radius:9px;background:#ffffff0d}
-.account-list .plus{color:#aef4df}.account-list .minus{color:#ffb9a3}
-.account-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
-.account-actions .danger{background:#4a2129;border-color:#ff8a7a66}
+/* El Perfil tiene su propia hoja: styles/profile.css */
 
 /* Tienda: 5 pestañas (Conseguir monedas) y monedero en la cabecera. */
 .shop-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}

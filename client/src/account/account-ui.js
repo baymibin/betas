@@ -1,15 +1,10 @@
 // Menú principal (panel de acceso) y Perfil de la cuenta.
 // Botones reales: "Continuar con Google" y "Continuar con Discord" abren el flujo oficial del
 // proveedor a través del servidor. Sin sesión se sigue jugando como invitado.
-import {account, refresh, login, link, logout, unlink, setNickname, transactions, consumeAuthRedirect, message,
-  formatCoins, COIN_ICONS, COIN_NAMES, providerName} from './account.js';
-import {profile, characters, boards, wings} from '../ui/shop.js';
-import {previewSvg} from '../characters/stick-avatar.js';
+import {account, refresh, login, logout, setNickname, consumeAuthRedirect, message, formatCoins, providerName, DEFAULT_AVATAR} from './account.js';
+import './profile-ui.js';
 
 const $ = id => document.getElementById(id);
-const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" fill="#0b4b5e"/><circle cx="24" cy="19" r="8" fill="#5ce8f0"/><path d="M9 44c1-9 7-14 15-14s14 5 15 14" fill="#5ce8f0"/></svg>');
-const TYPE_NAMES = {RACE_REWARD: 'Recompensa de carrera', ITEM_PURCHASE: 'Compra en La tiendita', GOLD_EXCHANGE: 'Conversión de oro', GOLD_CREDIT: 'Compra de Tablas de Oro', GOLD_REFUND: 'Reembolso', ADMIN_ADJUSTMENT: 'Ajuste administrativo'};
 
 function say(text, error = false) {
   const el = $('auth-message');
@@ -61,62 +56,8 @@ nickInput.addEventListener('input', () => {
   }, 700);
 });
 
-// ---------- Perfil ----------
-const profileDialog = $('profile-dialog');
-function renderProfileBasics() {
-  $('profile-preview').innerHTML = previewSvg(profile.character, profile.board);
-  $('profile-name').textContent = profile.nick || 'Surfer';
-  $('profile-style').textContent = characters[profile.character] + ' · ' + boards[profile.board] + (wings[profile.wing] ? ' · ' + wings[profile.wing] + ' Wings' : '');
-}
-async function renderProfile() {
-  renderProfileBasics();
-  const box = $('account-profile');
-  if (!account.authenticated) {
-    $('profile-note').textContent = 'Juegas como invitado: tu estilo se guarda en este navegador. Inicia sesión para guardar tu progreso, tus monedas y tu inventario en tu cuenta.';
-    box.innerHTML = `<section class="account-section"><h3>GUARDA TU PROGRESO</h3><div class="account-providers">
-      ${['google', 'discord'].map(p => `<div class="account-provider"><span>${providerName(p)}</span><button type="button" data-login="${p}" ${account.providers[p] ? '' : 'disabled title="Sin configurar en el servidor"'}>Continuar con ${providerName(p)}</button></div>`).join('')}
-      </div></section>`;
-    box.querySelectorAll('[data-login]').forEach(b => b.onclick = () => login(b.dataset.login));
-    return;
-  }
-  $('profile-note').textContent = 'Tu cuenta guarda monedas, inventario y equipamiento: los recuperas en cualquier PC.';
-  const u = account.user, linked = new Map(account.identities.map(i => [i.provider, i]));
-  box.innerHTML = `
-    <div class="account-head"><img src="${escapeHtml(u.avatarUrl || DEFAULT_AVATAR)}" alt="" referrerpolicy="no-referrer">
-      <div><div class="account-nick"><input id="profile-nick" maxlength="16" value="${escapeHtml(u.nickname)}" aria-label="Nickname"><button type="button" id="profile-nick-save">Guardar</button></div>
-      <div class="account-id">ID Surf Salvaje: ${escapeHtml(u.id)}</div></div></div>
-    <section class="account-section"><h3>MONEDERO</h3><div class="account-wallet">
-      ${['NORMAL_COIN', 'GOLD_COIN'].map(c => `<span class="coin-chip${c === 'GOLD_COIN' ? ' gold' : ''}"><img src="${COIN_ICONS[c]}" alt="">${COIN_NAMES[c]}: <b>${formatCoins(account.wallet[c])}</b></span>`).join('')}
-    </div></section>
-    <section class="account-section"><h3>ACCESOS VINCULADOS</h3><div class="account-providers">
-      ${['google', 'discord'].map(p => linked.has(p)
-        ? `<div class="account-provider"><span>${providerName(p)} <span class="linked">· vinculado como ${escapeHtml(linked.get(p).displayName || '—')}</span></span>${account.identities.length > 1 ? `<button type="button" data-unlink="${p}">Desvincular</button>` : '<span class="linked">Acceso principal</span>'}</div>`
-        : `<div class="account-provider"><span>${providerName(p)}</span><button type="button" data-link="${p}" ${account.providers[p] ? '' : 'disabled title="Sin configurar en el servidor"'}>Vincular ${providerName(p)}</button></div>`).join('')}
-    </div></section>
-    <section class="account-section"><h3>EQUIPAMIENTO</h3><p>${escapeHtml(characters[profile.character])} · ${escapeHtml(boards[profile.board])} · ${escapeHtml(wings[profile.wing] || '')} Wings · ${profile.hat ? 'Hat ' + profile.hat : 'Sin hat'}</p></section>
-    <section class="account-section"><h3>INVENTARIO</h3>${account.inventory.length
-      ? `<ul class="account-list">${account.inventory.map(i => `<li><span>${escapeHtml(i.itemId)}</span><span>${escapeHtml(i.source)}</span></li>`).join('')}</ul>`
-      : '<p>Los artículos gratuitos están disponibles para todos. Lo que compres en La tiendita aparecerá aquí.</p>'}</section>
-    <section class="account-section"><h3>HISTORIAL</h3><ul class="account-list" id="profile-history"><li>Cargando...</li></ul></section>
-    <div class="account-actions"><button type="button" class="danger" id="profile-logout">Cerrar sesión</button></div>`;
-  box.querySelectorAll('[data-link]').forEach(b => b.onclick = () => link(b.dataset.link));
-  box.querySelectorAll('[data-unlink]').forEach(b => b.onclick = async () => {
-    try { await unlink(b.dataset.unlink); renderProfile(); } catch (e) { alert(message(e.code)); }
-  });
-  $('profile-nick-save').onclick = async () => {
-    try { await setNickname($('profile-nick').value); renderProfileBasics(); nickInput.value = account.user.nickname; } catch (e) { alert(message(e.code)); }
-  };
-  $('profile-logout').onclick = async () => { await logout(); profileDialog.close(); };
-  try {
-    const {transactions: list} = await transactions(20);
-    $('profile-history').innerHTML = list.length ? list.map(t => `<li><span>${escapeHtml(TYPE_NAMES[t.type] || t.type)}${t.description ? ' · ' + escapeHtml(t.description) : ''}</span>
-      <span class="${t.amount > 0 ? 'plus' : 'minus'} coin-inline"><img src="${COIN_ICONS[t.currency]}" alt="${COIN_NAMES[t.currency]}">${t.amount > 0 ? '+' : '−'}${formatCoins(Math.abs(t.amount))}</span></li>`).join('')
-      : '<li>Aún no hay movimientos.</li>';
-  } catch { $('profile-history').innerHTML = '<li>No se pudo cargar el historial.</li>'; }
-}
-$('home-profile').onclick = () => { renderProfile(); profileDialog.showModal(); };
-
-document.addEventListener('surf:account', () => { renderHome(); if (profileDialog.open) renderProfile(); });
+// El Perfil (invitado y cuenta) vive en profile-ui.js.
+document.addEventListener('surf:account', renderHome);
 // Al terminar una carrera el servidor puede haber dado una recompensa: se refresca el saldo.
 document.addEventListener('surf:menu', () => { if (account.authenticated) refresh(); });
 

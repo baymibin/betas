@@ -269,6 +269,42 @@ Paquetes en `config/economy.json → exchangePackages`: Pequeño 500, Mediano 1.
 - Cabeceras `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: same-origin` en la API.
 - *Pendiente:* HTTPS en producción (obligatorio para Google fuera de localhost) y cabeceras CSP.
 
+## Remasterización del perfil "Mi surfer" (2026-09-27)
+
+**IMPLEMENTADO · PROBADO en navegador (Chromium) a 1920×1080, 1672×941, 1366×768 y 390×844.**
+
+Un único modal (`#profile-dialog`) para invitado y cuenta, con el mismo tamaño, el mismo fondo y la misma columna izquierda; solo cambia la columna derecha según haya sesión.
+
+- **Formato:** panorámico como La tiendita, `width:min(1180px,96vw)`, `max-height:94dvh`, radio de 22 px, borde turquesa y cristal azul petróleo. El fondo del modal y el `::backdrop` usan `shop-bg-tropical.webp` con un velo suave (se ven las islas, las palmeras y el atardecer). Dos columnas 45 % / 55 %. En escritorio no hay scroll interno; por debajo de 900 px de ancho las columnas se apilan y el modal hace scroll vertical.
+- **Columna izquierda (común):** kicker "TU IDENTIDAD EN EL AGUA", título "Mi surfer" con icono de ola y **escena 3D real**. Esta es una segunda instancia de `createShopPreview` (el mismo módulo de La tiendita, sin duplicar lógica), sobre `shop-preview-backdrop.webp`, con la roca, el personaje, la tabla y las wings equipadas, las alas animadas y giro con el ratón. Debajo, el nick grande, la línea "personaje · tabla · wings" (del equipo real) y la tarjeta del nick: avatar, campo con lápiz y botón Guardar. Con cuenta se añade el ID Surf Salvaje con botón de copiar.
+- **Nick:** es uno solo. Con cuenta se guarda en el servidor (`/api/account/nickname`); como invitado, en el perfil del navegador (el mismo que el campo "TU NICK" del menú).
+- **Invitado (imagen A):**
+  - tarjeta "GUARDA TU PROGRESO" con los botones reales **Continuar con Google** y **Continuar con Discord** (los mismos flujos OAuth del login; sin credenciales explican que falta configurarlos);
+  - tres tarjetas: Guarda monedas, Recupera inventario y Accede desde cualquier PC;
+  - nota "MODO INVITADO";
+  - pie con **Personalizar en la tienda** y **Practicar en solitario**.
+  - No se muestran saldos.
+- **Cuenta (imagen B):**
+  - **Monedero** con los saldos reales;
+  - **Accesos vinculados** con el estado real: Vincular / Desvincular / "Acceso principal" si es el único;
+  - **Equipamiento** con 4 tarjetas visuales: personaje (SVG), tabla (imagen real), wings (sprite real), y hat o "Sin hat";
+  - **Inventario** real (o un estado vacío) con acceso a La tiendita;
+  - **Historial** real del servidor;
+  - pie con **Personalizar en la tienda** y **Cerrar sesión** (acento rojo).
+- **Tiempo real:** si cambia la sesión o el equipo con el perfil abierto, se vuelve a pintar y la escena 3D se actualiza.
+
+Archivos:
+- Creados: `client/src/account/profile-ui.js` y `client/styles/profile.css`.
+- Modificados: `client/index.html` (nuevo marcado del modal y enlace a `profile.css`), `client/src/account/account-ui.js` (el perfil sale de aquí), `client/src/account/account.js` (`DEFAULT_AVATAR` compartido) y `client/styles/account.css` (se retiran los estilos del perfil antiguo).
+- Estilos reutilizados: fondo y escenario de La tiendita (`shop-bg-tropical.webp`, `shop-preview-backdrop.webp`), botones dorados, cristal y bordes turquesa, iconos de moneda (`tabla-normal.svg`, `tabla-oro.svg`) y el sprite de wings.
+
+Pruebas (Playwright, servidor real, cuenta de prueba creada con `loginIdentity` + sesión):
+- Invitado: Google y Discord visibles, y abren `accounts.google.com` (`scope=openid profile`) y `discord.com/oauth2/authorize` (`scope=identify`) cuando hay credenciales; sin ellas lo explican. El nick se guarda en el perfil, el menú y el navegador. Personalizar abre La tiendita. Practicar arranca la práctica.
+- Cuenta: saldos, accesos, equipo (3 activos + sin hat), inventario e historial reales. El nick se guarda en el servidor. Cerrar sesión vuelve al modo invitado en el mismo modal.
+- Sin errores de consola. Sin scroll horizontal. Sin scroll interno en escritorio (1366×768 incluido). `npm test` 60/60.
+
+Pendiente: avatar propio para invitados (hoy se usa el genérico); hats reales en el equipamiento cuando existan; el sprite de wings de la tarjeta muestra el primer fotograma (sin animación).
+
 ## 21. Archivos modificados (esta fase)
 
 - `client/index.html`: logo SVG, panel de acceso, botones de Google y Discord, datos con iconos, perfil y tienda (monedero, pestaña Conseguir monedas).
@@ -383,6 +419,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-27 · Remasterización del perfil "Mi surfer"
+- Nuevo modal panorámico de dos columnas, compartido por invitado y cuenta, con la escena 3D de La tiendita y el equipo real (detalles en la sección "Remasterización del perfil").
 
 ### 2026-09-27 · Fase 1b · Soporte MySQL/MariaDB (aaPanel)
 - `DATABASE_URL=mysql://...` usa MySQL/MariaDB; sin ella, SQLite. Las tablas se crean solas (migraciones por motor).

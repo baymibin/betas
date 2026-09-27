@@ -113,6 +113,8 @@ export const formatCoins = n => Math.max(0, Math.floor(Number(n) || 0)).toLocale
 export const COIN_ICONS = {NORMAL_COIN: '/assets/images/currency/tabla-normal.svg', GOLD_COIN: '/assets/images/currency/tabla-oro.svg'};
 export const COIN_NAMES = {NORMAL_COIN: 'Tablas Normales', GOLD_COIN: 'Tablas de Oro'};
 export const providerName = p => PROVIDER_NAMES[p] || p;
+// Avatar por defecto (cuenta sin foto o invitado).
+export const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" fill="#0b4b5e"/><circle cx="24" cy="19" r="8" fill="#5ce8f0"/><path d="M9 44c1-9 7-14 15-14s14 5 15 14" fill="#5ce8f0"/></svg>');
 
 // Vuelta del proveedor: ?auth=ok|linked · ?auth_error=codigo. Se lee una vez y se limpia la URL.
 export function consumeAuthRedirect() {
