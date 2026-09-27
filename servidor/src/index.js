@@ -177,5 +177,5 @@ let lastSnapshot = 0;
 const SNAPSHOT_BACKLOG = 4096;
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
-  console.log('Surf Salvaje: http://localhost:' + (process.env.PORT || 3000));
+  console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));
 });
