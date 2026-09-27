@@ -1,0 +1,176 @@
+/* Surf Salvaje · Perfil "Mi surfer" (invitado y cuenta comparten el mismo modal).
+   Mismo lenguaje que La tiendita: fondo tropical, escenario 3D, cristal azul petróleo y bordes turquesa. */
+.profile-dialog{--pf-petrol:#082b3a;--pf-deep:#062532;--pf-cyan:#57e3ee;--pf-gold:#ffd46b;--pf-text2:#b8d4df;--pf-line:#8feaf04d;
+  width:min(1180px,96vw);max-width:none;max-height:94dvh;padding:0;border:1px solid #b8f3ff78;border-radius:22px;overflow:hidden;
+  background:#082e3b;color:#f6ffff;font-family:'Baloo 2',sans-serif;box-shadow:0 26px 90px #00131dbb,inset 0 0 0 1px #ffffff25}
+.profile-dialog::backdrop{background:linear-gradient(#001d2c66,#00172599),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;backdrop-filter:blur(6px)}
+.profile-shell{position:relative;max-height:94dvh;overflow:auto;box-sizing:border-box;padding:24px 28px 16px;display:flex;flex-direction:column;gap:14px;
+  background:linear-gradient(115deg,#062c40ee 0%,#063a4cde 50%,#074253c4 100%),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;scrollbar-width:thin;scrollbar-color:#57e3ee55 transparent}
+.profile-close{position:absolute;top:16px;right:18px;z-index:5;width:46px;height:46px;border-radius:50%;border:1.5px solid #cdf7ff99;background:#06283acc;color:#fff;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 4px 14px #0009}
+.profile-close:hover{background:#0b4b5e}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.profile-layout{display:grid;grid-template-columns:minmax(0,45fr) minmax(0,55fr);gap:22px;align-items:start}
+.profile-left{display:flex;flex-direction:column;min-width:0}
+.profile-kicker{font-size:12px;font-weight:900;letter-spacing:5px;color:var(--pf-cyan);margin:4px 0 0 4px}
+.profile-title{display:flex;align-items:center;gap:12px;margin:0 0 10px 2px;font-size:clamp(34px,3.4vw,48px);font-weight:800;line-height:1.05;letter-spacing:-.5px;text-shadow:0 3px 12px #001b24bb}
+.profile-title img{width:48px;height:48px;object-fit:contain}
+
+/* Escenario: la misma escena 3D de La tiendita (roca, palmeras y océano) con el equipo real. */
+.profile-stage{position:relative;height:clamp(300px,44dvh,440px);border-radius:20px;overflow:hidden;border:1px solid #a4eaff39;
+  background:linear-gradient(180deg,#072b4020 0%,#07374800 58%,#044655c0 100%),url('/assets/images/shop/shop-preview-backdrop.webp') center 54%/cover;box-shadow:inset 0 0 35px #6cf9ff13}
+.profile-stage canvas{position:absolute;inset:0 0 70px;width:100%;height:calc(100% - 70px);outline:none;touch-action:none;cursor:grab}
+.profile-identity{position:absolute;left:0;right:0;bottom:10px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+.profile-identity h3{margin:0;font-size:clamp(26px,2.4vw,34px);font-weight:800;line-height:1.1;text-shadow:0 3px 10px #001a24;max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-identity p{margin:0;padding:4px 18px;border-radius:12px;border:1px solid #9df3ff66;background:#052a3bd9;font-size:14px;font-weight:600;color:#e9fbff;max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.profile-nick-card{display:flex;align-items:center;gap:14px;margin-top:14px;padding:12px 16px;border-radius:18px;border:1px solid var(--pf-line);background:#05293acc;box-shadow:inset 0 0 20px #57e3ee0d}
+.profile-avatar{width:78px;height:78px;flex:none;border-radius:50%;object-fit:cover;border:3px solid var(--pf-cyan);background:#0b4b5e;box-shadow:0 0 16px #57e3ee55}
+.profile-nick-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.profile-nick-row{display:flex;gap:10px;align-items:center}
+.profile-nick-field{position:relative;flex:1;min-width:0}
+.profile-nick-field input{width:100%;height:48px;box-sizing:border-box;padding:0 40px 0 14px;border-radius:12px;border:1px solid #a6e4ee70;background:#021e2dcc;color:#fff;font:700 17px 'Baloo 2',sans-serif}
+.profile-nick-field input:focus{outline:none;border-color:var(--pf-cyan);box-shadow:0 0 0 3px #57e3ee33}
+.profile-nick-field svg{position:absolute;right:13px;top:50%;width:18px;height:18px;transform:translateY(-50%);fill:#d7eef3;pointer-events:none}
+.profile-nick-save{flex:none;min-width:120px;height:52px;padding:0 16px;border-radius:12px;border:1px solid #fff0b0;background:linear-gradient(180deg,#ffe07a,#ffc23d);color:#13262d;
+  font:800 16px/1.05 'Baloo 2',sans-serif;cursor:pointer;box-shadow:0 0 16px #ffc83c66,inset 0 2px 0 #fffbe0}
+.profile-nick-save:disabled{opacity:.6;cursor:default}
+.profile-id{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--pf-text2);word-break:break-all}
+.profile-id button{flex:none;background:none;border:0;padding:2px;color:#cdefff;cursor:pointer}
+.profile-id svg{width:15px;height:15px;fill:currentColor;display:block}
+.profile-nick-status{font-size:12px;color:#aef4df;min-height:0}
+.profile-nick-status.error{color:#ffb9a3}
+
+/* ---------- Columna derecha ---------- */
+.profile-right{min-width:0;display:flex;flex-direction:column;gap:10px;padding-top:6px}
+.profile-right.is-guest{padding-top:44px}
+.pf-card{border-radius:18px;border:1px solid var(--pf-line);background:linear-gradient(160deg,#06344acc,#04283bd9);box-shadow:inset 0 0 22px #57e3ee0d,0 10px 26px #00121c40;padding:12px 16px}
+.pf-section-title{margin:0 0 8px;font-size:12px;font-weight:900;letter-spacing:3px;color:#9ff4e6}
+
+/* Invitado */
+.pf-guest{padding:24px 26px 22px;display:flex;flex-direction:column;gap:14px}
+.pf-guest h3{margin:0;font-size:clamp(24px,2vw,30px);font-weight:800;letter-spacing:2px;line-height:1.1}
+.pf-guest > p{margin:-4px 0 4px;color:#d9eef4;font-size:16px;line-height:1.45}
+.pf-provider-btn{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:60px;padding:0 64px;border-radius:12px;border:1px solid transparent;
+  font:800 19px 'Baloo 2',sans-serif;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}
+.pf-provider-btn .pf-logo{position:absolute;left:26px;width:30px;height:30px}
+.pf-provider-btn .pf-chevron{position:absolute;right:24px;width:22px;height:22px}
+.pf-provider-btn.google{background:#fff;color:#1f2a33;border-color:#dfe7ec;box-shadow:0 4px 14px #00121c50}
+.pf-provider-btn.google .pf-chevron{fill:#1f2a33}
+.pf-provider-btn.google:hover{background:#f3f7fa;transform:translateY(-1px)}
+.pf-provider-btn.discord{background:linear-gradient(180deg,#6571ff,#4e5af0);color:#fff;border-color:#8c95ff;box-shadow:0 4px 16px #1b1f6b66}
+.pf-provider-btn.discord .pf-chevron{fill:#fff}
+.pf-provider-btn.discord:hover{background:linear-gradient(180deg,#5b67f5,#4752c4);transform:translateY(-1px)}
+.pf-provider-btn.is-unconfigured{cursor:help}
+.pf-benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:4px}
+.pf-benefit{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:16px 10px 14px;border-radius:14px;border:1px solid #8feaf038;background:#05293acc}
+.pf-benefit svg{width:58px;height:58px;margin-bottom:4px;filter:drop-shadow(0 4px 8px #0008)}
+.pf-benefit strong{font-size:16px;line-height:1.15}
+.pf-benefit small{font-size:13px;color:var(--pf-text2);line-height:1.3}
+.pf-guest-note{display:flex;gap:14px;align-items:center;padding:14px 16px;border-radius:14px;border:1px solid #8feaf038;background:#04233299}
+.pf-guest-note svg{flex:none;width:46px;height:46px;padding:9px;box-sizing:border-box;border-radius:50%;background:#0b4b5e;fill:#dff7ff}
+.pf-guest-note b{display:block;font-size:11px;letter-spacing:4px;color:var(--pf-cyan);margin-bottom:4px}
+.pf-guest-note span{font-size:14px;color:#dcecf1;line-height:1.45}
+.pf-message{margin:0;font-size:13px;font-weight:700;color:#ffb9a3;text-align:center}
+.pf-message:empty{display:none}
+
+/* Cuenta: monedero */
+.pf-wallet{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pf-coin{display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:14px;border:1px solid #57e3ee55;background:#04283acc}
+.pf-coin img{width:50px;height:50px;padding:6px;box-sizing:border-box;border-radius:50%;background:#062f44;border:1px solid #57e3ee55}
+.pf-coin span{display:flex;flex-direction:column;line-height:1.15}
+.pf-coin small{font-size:15px;font-weight:700;color:#fff}
+.pf-coin b{font-size:24px;font-variant-numeric:tabular-nums;color:#fff}
+.pf-coin.gold{border-color:#ffd25780;background:linear-gradient(135deg,#3a3510cc,#1c2c26cc)}
+.pf-coin.gold img{border-color:#ffd25780}
+.pf-coin.gold small,.pf-coin.gold b{color:var(--pf-gold)}
+
+/* Cuenta: accesos vinculados */
+.pf-providers{display:grid;gap:6px}
+.pf-provider-row{display:flex;align-items:center;gap:12px;padding:5px 10px;border-radius:12px;background:#0428394d}
+.pf-provider-row .pf-picon{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center}
+.pf-provider-row .pf-picon.google{background:#fff}
+.pf-provider-row .pf-picon.discord{background:#5865f2}
+.pf-provider-row .pf-picon svg{width:20px;height:20px}
+.pf-provider-row .pf-pname{flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-provider-row .pf-pname small{color:var(--pf-text2);font-size:13px}
+.pf-link-btn{flex:none;min-width:154px;height:38px;padding:0 14px;border-radius:10px;border:1px solid #8feaf088;background:#0b4f62;color:#fff;font:800 14px 'Baloo 2',sans-serif;cursor:pointer}
+.pf-link-btn:hover{background:#106075}
+.pf-link-btn.is-main{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-color:#5fe8a0aa;background:#0b3d33;color:#aef4c9;cursor:default}
+.pf-link-btn.is-main svg{width:16px;height:16px;fill:#5fe8a0}
+.pf-link-btn:disabled:not(.is-main){opacity:.55;cursor:help}
+
+/* Cuenta: equipamiento */
+.pf-equipment{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pf-eq{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px;border-radius:14px;border:1px solid #8feaf038;background:#05293acc;min-width:0}
+.pf-eq-art{height:64px;width:100%;display:grid;place-items:center}
+.pf-eq-art svg{height:62px;width:56px}
+.pf-eq-art img{max-height:62px;max-width:80%;object-fit:contain}
+.pf-eq-art .wing{width:84px;height:62px;background-repeat:no-repeat;background-position:0 0;background-size:400% 200%}
+.pf-eq-art .hat svg{width:52px;height:52px;fill:#c8d8de}
+.pf-eq strong{font-size:14px;line-height:1.1;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-eq em{font-style:normal;font-size:10px;font-weight:900;letter-spacing:1.5px;color:#0a2b20;background:#5fe8a0;border-radius:5px;padding:1px 8px}
+.pf-eq.is-empty strong{color:var(--pf-text2)}
+
+/* Cuenta: inventario e historial */
+.pf-row-note{display:flex;align-items:center;gap:14px;padding:8px 10px;border-radius:12px;background:#0428394d;font-size:14px;color:#dcecf1;line-height:1.4}
+.pf-row-note svg{flex:none;width:34px;height:34px}
+.pf-inventory{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pf-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;border:1px solid #57e3ee55;background:#04283acc;font-size:13px;font-weight:700}
+.pf-inventory button{margin-left:auto;padding:6px 14px;border-radius:10px;border:1px solid #8feaf088;background:#0b4f62;color:#fff;font:800 13px 'Baloo 2',sans-serif;cursor:pointer}
+.pf-history{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:128px;overflow:auto;scrollbar-width:thin;scrollbar-color:#57e3ee55 transparent}
+.pf-history li{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:10px;background:#0428394d;font-size:13px}
+.pf-history li > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-history li > svg{flex:none;width:22px;height:22px}
+.pf-history time{color:var(--pf-text2);font-size:12px;flex:none}
+.pf-history .amount{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.pf-history .amount img{width:18px;height:18px}
+.pf-history .plus{color:#aef4df}.pf-history .minus{color:#ffb9a3}
+
+/* ---------- Pie ---------- */
+.profile-footer{border-top:1px solid #8feaf04d;padding-top:14px;display:flex;flex-direction:column;gap:8px}
+.profile-actions{display:flex;gap:14px}
+.profile-shop-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:12px;height:62px;border-radius:14px;border:1px solid #fff0b0;
+  background:linear-gradient(180deg,#ffe07a,#ffc23d);color:#13262d;font:800 22px 'Baloo 2',sans-serif;cursor:pointer;box-shadow:0 0 22px #ffc83c66,0 8px 18px #00121c66,inset 0 2px 0 #fffbe0}
+.profile-shop-btn svg{width:28px;height:28px;fill:#13262d}
+.profile-shop-btn:hover{filter:brightness(1.04)}
+.profile-secondary{flex:none;min-width:290px;display:flex;align-items:center;justify-content:center;gap:10px;height:62px;padding:0 24px;border-radius:14px;
+  border:1.5px solid #57e3eeaa;background:#052a3bcc;color:#7ff5ee;font:800 20px 'Baloo 2',sans-serif;cursor:pointer}
+.profile-secondary svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2}
+.profile-secondary:hover{background:#0a3d50}
+.profile-secondary.is-logout{min-width:170px;border-color:#ff8a7a88;background:#2a1a24cc;color:#ffb3a6;font-size:17px}
+.profile-secondary.is-logout:hover{background:#3a1f28}
+.profile-note{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:#cfe3ea;text-align:center}
+.profile-note svg{flex:none;width:18px;height:18px;fill:#8fd4ff}
+
+/* ---------- Pantallas más bajas o estrechas ---------- */
+@media (max-height:820px) and (min-width:901px){
+  .profile-shell{padding:18px 24px 12px;gap:10px}.profile-stage{height:clamp(260px,40dvh,360px)}.profile-title{font-size:36px;margin-bottom:6px}
+  .profile-avatar{width:62px;height:62px}.profile-nick-card{margin-top:10px;padding:10px 14px}.pf-card{padding:12px 14px}
+  .pf-guest{padding:18px 20px;gap:10px}.pf-provider-btn{height:52px}.pf-benefit{padding:10px 8px}.pf-benefit svg{width:44px;height:44px}
+  .profile-shop-btn,.profile-secondary{height:52px;font-size:19px}.pf-eq-art{height:60px}.pf-eq-art svg{height:58px}.pf-eq-art img{max-height:58px}
+  .pf-history{max-height:96px}.profile-right{gap:8px}.profile-right.is-guest{padding-top:38px}
+}
+@media (max-width:900px){
+  .profile-layout{grid-template-columns:1fr}.profile-right{padding-top:0}.profile-stage{height:min(52vh,380px)}
+  .profile-actions{flex-direction:column}.profile-secondary,.profile-secondary.is-logout{min-width:0;width:100%}
+}
+@media (max-width:560px){
+  .profile-shell{padding:16px 12px 12px}.profile-title{font-size:30px}.profile-title img{width:36px;height:36px}
+  .pf-benefits{grid-template-columns:1fr}.pf-wallet{grid-template-columns:1fr}.pf-equipment{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pf-provider-btn{font-size:16px;padding:0 48px}.pf-provider-btn .pf-logo{left:16px}.pf-link-btn{min-width:0}
+  .profile-nick-row{flex-direction:column;align-items:stretch}.profile-nick-save{height:44px}.profile-shop-btn{font-size:18px}
+}
+.profile-right:not(.is-guest) > .pf-card:first-child{margin-right:56px}
+@media (max-width:900px){.profile-right:not(.is-guest) > .pf-card:first-child{margin-right:0}}
+/* Portátiles (≈1366×768): la vista con cuenta entra completa, con el pie visible. */
+@media (max-height:820px) and (min-width:901px){
+  .profile-right:not(.is-guest) .pf-card{padding:9px 14px}
+  .profile-right:not(.is-guest) .pf-section-title{margin-bottom:6px;font-size:11px}
+  .pf-coin{padding:5px 12px}.pf-coin img{width:40px;height:40px;padding:5px}.pf-coin b{font-size:20px}.pf-coin small{font-size:14px}
+  .pf-provider-row{padding:2px 8px}.pf-provider-row .pf-picon{width:30px;height:30px}.pf-link-btn{height:33px}
+  .pf-eq{padding:6px 4px}.pf-eq-art{height:48px}.pf-eq-art svg{height:46px;width:44px}.pf-eq-art img{max-height:46px}.pf-eq-art .wing{width:66px;height:46px}.pf-eq-art .hat svg{width:40px;height:40px}
+  .pf-row-note{padding:4px 8px}.pf-history{max-height:74px}.pf-history li{padding:4px 10px}
+  .profile-shop-btn,.profile-secondary{height:48px;font-size:18px}.profile-footer{padding-top:10px;gap:5px}
+}
+@media (max-width:900px){.profile-right.is-guest{padding-top:0}.profile-kicker,.profile-title{padding-right:56px}.profile-identity p{white-space:normal;text-align:center}}
