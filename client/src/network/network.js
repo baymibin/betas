@@ -1,11 +1,12 @@
 import {RemoteTimeline} from './remote-timeline.js';
 import {TYPE,readPowerWorld,read,input,states,profilePacket,roomRequest,readRoom,packet,roomBots,PROTOCOL_VERSION} from '../shared/protocol.js';
 import {advance,DT} from '../shared/simulation.js';
+import {predictSelfPower} from '../shared/powerups.js';
 export class SurfNetwork {
   constructor(status) { this.status=status; this.pending=[]; this.remote=[]; this.buttons=0; this.axis=0; this.seq=0; this.errorX=0; this.errorZ=0; }
   connect(profile,options={mode:1,mapId:0}) {
     this.close();this.room=null;this.options=options;this.powerWorld={taken:new Set(),entities:[]};this.timeline=new RemoteTimeline();
-    this.pending=[]; this.remote=[]; this.seq=0; this.buttons=0; this.player=null;this.authoritative=null;this.errorX=0;this.errorZ=0;
+    this.pending=[]; this.remote=[]; this.seq=0; this.buttons=0; this.player=null;this.authoritative=null;this.errorX=0;this.errorZ=0;this.prev=null;
     return new Promise((resolve,reject) => {
       const ws=this.ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/play`);
       ws.binaryType='arraybuffer';
@@ -29,11 +30,12 @@ export class SurfNetwork {
           this.pending=this.pending.filter(c=>c.seq>own.seq);
           const before=this.player;
           this.players=list;this.authoritative={...own};this.player={...own};
-          for(const c of this.pending) advance(this.player,c.axis,c.buttons);
+          for(const c of this.pending) this.step(this.player,c);
           // Corrección del servidor (poderes que el cliente no predice, p. ej. el pulso de un bot):
           // se guarda como error visual que se disipa en unos 150 ms en vez de teletransportar.
-          if(before){this.errorX+=before.x-this.player.x;this.errorZ+=before.z-this.player.z;
-            if(Math.hypot(this.errorX,this.errorZ)>8){this.errorX=0;this.errorZ=0;}}
+          if(before){const dx=this.player.x-before.x,dz=this.player.z-before.z;this.errorX-=dx;this.errorZ-=dz;
+            if(this.prev){this.prev.x+=dx;this.prev.z+=dz;}
+            if(Math.hypot(this.errorX,this.errorZ)>8){this.errorX=0;this.errorZ=0;this.prev=null;}}
           this.timeline.push(v.getUint32(8,true),list.filter(p=>p.id!==this.id),performance.now());this.remote=this.timeline.frames;
           this.onRoom?.(this.room,list);
           this.status(`ONLINE  -  ${list.length}/${this.room?.capacity||8} SURFISTAS`);
@@ -48,12 +50,21 @@ export class SurfNetwork {
     if(!this.player || this.ws.readyState!==1 || !this.room?.started) return;
     if(this.pending.length>=90 || this.ws.bufferedAmount>4096) { this.status('RECUPERANDO CONEXION...'); return; }
     const c={seq:++this.seq,axis:Math.round(this.axis*127)/127,buttons:this.buttons | (this.boostHeld?2:0) | (this.throttleHeld?8:0)}; this.buttons=0;
-    this.pending.push(c); advance(this.player,c.axis,c.buttons); this.ws.send(input(c.seq,c.axis,c.buttons));
+    this.prev={x:this.player.x,y:this.player.y,z:this.player.z};this.stepAt=performance.now();
+    this.pending.push(c); this.step(this.player,c); this.ws.send(input(c.seq,c.axis,c.buttons));
   }
-  // Estado a dibujar: la predicción más el error de corrección pendiente, que decae con dt.
+  // Un tick de predicción: la física y, si se pulsó E, el efecto propio de Tiki/Ola cohete/Delfín
+  // (mismo orden que el servidor: advance y después stepPowerWorld). El resto de poderes depende
+  // de otros jugadores y sigue llegando del servidor.
+  step(p,c){advance(p,c.axis,c.buttons);if(c.buttons&4)predictSelfPower(p);}
+  // Estado a dibujar: interpolado entre el tick anterior y el actual (los ticks van a 30 Hz y el
+  // render a la tasa del monitor) más el error de corrección pendiente, que decae con dt.
   view(dt){const k=Math.exp(-20*dt);this.errorX*=k;this.errorZ*=k;
-    if(Math.abs(this.errorX)<1e-3&&Math.abs(this.errorZ)<1e-3){this.errorX=0;this.errorZ=0;return this.player;}
-    return {...this.player,x:this.player.x+this.errorX,z:this.player.z+this.errorZ};}
+    if(Math.abs(this.errorX)<1e-3&&Math.abs(this.errorZ)<1e-3){this.errorX=0;this.errorZ=0;}
+    const p=this.player,a=this.prev?Math.max(0,Math.min(1,(performance.now()-this.stepAt)/(DT*1000))):1;
+    if(a===1&&!this.errorX&&!this.errorZ)return p;
+    const lerp=k=>a===1?p[k]:this.prev[k]+(p[k]-this.prev[k])*a;
+    return {...p,x:lerp('x')+this.errorX,y:lerp('y'),z:lerp('z')+this.errorZ};}
   // Reenvía el perfil visual (skin, tabla, wings, hat) si el jugador cambia su equipamiento
   // estando conectado; el servidor lo propaga a todos en el siguiente SNAPSHOT.
   sendProfile(profile){if(this.ws?.readyState===1&&this.id!==undefined&&!this.legacyServer)this.ws.send(profilePacket(profile));}

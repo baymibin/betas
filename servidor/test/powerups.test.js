@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createPlayer,advance} from '../../client/src/shared/simulation.js';
-import {createPowerWorld,stepPowerWorld,hurt,makeBoxes} from '../../client/src/shared/powerups.js';
+import {createPowerWorld,stepPowerWorld,hurt,makeBoxes,predictSelfPower} from '../../client/src/shared/powerups.js';
 import {LAP_LENGTH} from '../../client/src/shared/course.js';
 import {snapshot,states,read,powerWorldPacket,readPowerWorld,input} from '../../client/src/shared/protocol.js';
 test('one box has only one owner and cannot be farmed',()=>{const w=createPowerWorld(1),a=createPlayer(1),b=createPlayer(2),box=w.boxes.find(b=>b.y===1.1);a.x=b.x=box.x;a.z=b.z=box.z+1;stepPowerWorld(w,[a,b]);a.z=b.z=box.z-1;stepPowerWorld(w,[a,b],[],()=>0);assert.equal(a.heldItem,1);assert.equal(b.heldItem,0);assert.ok(w.taken.has(box.id));a.heldItem=0;stepPowerWorld(w,[a,b]);assert.equal(a.heldItem,0);});
@@ -61,4 +61,16 @@ test('el remolino persiste entre vueltas hasta que alguien lo atraviesa',()=>{
 test('el remolino viaja por red con su estado persistente',()=>{
  const w=createPowerWorld(5);w.entities.push({id:7,kind:4,owner:1,target:0,x:1.5,z:-420,y:.1,ttl:65000});
  const back=readPowerWorld(read(powerWorldPacket(w)));assert.equal(back.entities[0].kind,4);assert.equal(back.entities[0].ttl,65000);
+});
+
+test('client prediction of own Tiki, rocket and dolphin matches the server exactly',()=>{
+ for(const [kind,y] of [[1,0],[2,0],[7,0],[7,2],[3,0],[5,0]]){
+  const base={...createPlayer(4),heldItem:kind,y,slowTicks:20,impulse:-.5},server={...base},client={...base},other={...createPlayer(5),z:-40};
+  advance(server,0,4);stepPowerWorld(createPowerWorld(1),[server,other],[4]);
+  advance(client,0,4);predictSelfPower(client);
+  // Los poderes que dependen de rivales (3, 5...) no se predicen: el cliente conserva el objeto.
+  if([1,2,7].includes(kind))assert.deepEqual(client,server,'kind '+kind+' y '+y);
+  else {assert.equal(client.heldItem,kind);}
+ }
+ const waiting={...createPlayer(6),heldItem:2,countdown:5};predictSelfPower(waiting);assert.equal(waiting.heldItem,2);assert.equal(waiting.turboTicks,0);
 });

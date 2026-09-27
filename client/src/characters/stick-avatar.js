@@ -137,12 +137,16 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
   // Seamless joint caps matching the exact stroke thickness to smoothly round corners
   // 0: Hips, 1: Chest/Shoulders, 2: Left Shoulder, 3: Left Hand,
   // 4: Right Shoulder, 5: Right Hand, 6: Left Knee, 7: Left Foot, 8: Right Knee, 9: Right Foot
-  const joints = Array.from({length: 10}, (_, i) => {
-    const m = B.MeshBuilder.CreateSphere('joint-' + i, {diameter: strokeDiameter, segments: 10}, scene);
-    m.parent = rig;
-    m.material = bodyMat;
-    return m;
-  });
+  // Articulaciones y extremidades se dibujan como thin instances: 2 draw calls por avatar en
+  // lugar de 19 (con 7 bots eran ~150 draw calls solo en brazos y piernas). Cada frame se
+  // escriben sus matrices locales en un buffer y se sube una sola vez.
+  const JOINTS = 10;
+  const jointMesh = B.MeshBuilder.CreateSphere('stick-joints', {diameter: strokeDiameter, segments: 10}, scene);
+  jointMesh.parent = rig;
+  jointMesh.material = bodyMat;
+  jointMesh.isPickable = false;
+  jointMesh.alwaysSelectAsActiveMesh = true;   // el bounding box de la esfera base no cubre las instancias
+  const jointMatrices = new Float32Array(16 * JOINTS);
 
   // Skeletal limb links: [startJoint, endJoint]
   const links = [
@@ -157,17 +161,19 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
     [8, 9]  // Right Shin
   ];
 
-  const limbs = links.map((_, i) => {
-    const m = B.MeshBuilder.CreateCylinder('limb-' + i, {
-      height: 1,
-      diameter: strokeDiameter,
-      tessellation: 12
-    }, scene);
-    m.parent = rig;
-    m.material = bodyMat;
-    m.rotationQuaternion = B.Quaternion.Identity();
-    return m;
-  });
+  const limbMesh = B.MeshBuilder.CreateCylinder('stick-limbs', {
+    height: 1,
+    diameter: strokeDiameter,
+    tessellation: 12
+  }, scene);
+  limbMesh.parent = rig;
+  limbMesh.material = bodyMat;
+  limbMesh.isPickable = false;
+  limbMesh.alwaysSelectAsActiveMesh = true;
+  const limbMatrices = new Float32Array(16 * links.length);
+  jointMesh.thinInstanceSetBuffer('matrix', jointMatrices, 16, false);
+  limbMesh.thinInstanceSetBuffer('matrix', limbMatrices, 16, false);
+  const limbMatrix = new B.Matrix(), limbScale = new B.Vector3(1, 1, 1), limbPosition = new B.Vector3(), limbRotation = new B.Quaternion();
 
   // 3D Animated Wings Accessory (9 High-Resolution Spritesheets from Root)
   const WING_FILES = [
@@ -286,9 +292,11 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
     }
 
     // Update joint spheres
-    for (let i = 0; i < joints.length; i++) {
-      joints[i].position.copyFrom(points[i]);
+    for (let i = 0; i < JOINTS; i++) {
+      B.Matrix.TranslationToRef(points[i].x, points[i].y, points[i].z, limbMatrix);
+      limbMatrix.copyToArray(jointMatrices, i * 16);
     }
+    jointMesh.thinInstanceBufferUpdated('matrix');
 
     // Connect and orient continuous limbs
     links.forEach(([a, b], i) => {
@@ -296,9 +304,8 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
       const length = direction.length();
       if (length > 0.001) {
         direction.scaleInPlace(1 / length);
-        const mesh = limbs[i];
-        mesh.position.copyFrom(points[a]).addInPlace(points[b]).scaleInPlace(0.5);
-        mesh.scaling.y = length + 0.04; // Encastre so no gaps exist at joints
+        limbPosition.copyFrom(points[a]).addInPlace(points[b]).scaleInPlace(0.5);
+        limbScale.y = length + 0.04; // Encastre so no gaps exist at joints
 
         B.Vector3.CrossToRef(up, direction, axis);
         if (axis.lengthSquared() < 0.000001) axis.set(1, 0, 0);
@@ -306,10 +313,13 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
         B.Quaternion.RotationAxisToRef(
           axis,
           Math.acos(Math.max(-1, Math.min(1, B.Vector3.Dot(up, direction)))),
-          mesh.rotationQuaternion
+          limbRotation
         );
+        B.Matrix.ComposeToRef(limbScale, limbRotation, limbPosition, limbMatrix);
+        limbMatrix.copyToArray(limbMatrices, i * 16);
       }
     });
+    limbMesh.thinInstanceBufferUpdated('matrix');
 
     // 4. Banking: Lean body and board into turn
     rig.rotation.z = -steer * 0.22;
