@@ -47,7 +47,7 @@ function sourceFiles(root) {
 // Rutas construidas en tiempo de ejecución que el escaneo literal no ve completas.
 function dynamicRefs(root) {
   const refs = [];
-  const shop = readFileSync(join(root, 'src/ui/shop.js'), 'utf8');
+  const shop = readFileSync(join(root, 'src/shared/catalog.js'), 'utf8');
   const wings = /wingFiles\s*=\s*\[([^\]]*)\]/.exec(shop);
   if (wings) for (const m of wings[1].matchAll(/'([^']+)'/g)) refs.push('/assets/images/wings/' + m[1]);
   for (let i = 1; i <= 8; i++) refs.push(`/assets/images/powerups/power-${i}.webp`);
@@ -67,7 +67,8 @@ function mapAssets(root) {
 function cosmetics(root) {
   const boards = [...readFileSync(join(root, 'src/shared/board-cosmetics.js'), 'utf8').matchAll(/file:'([^']+)'/g)].map(m => m[1]);
   const shop = readFileSync(join(root, 'src/ui/shop.js'), 'utf8');
-  const wings = [.../wingFiles\s*=\s*\[([^\]]*)\]/.exec(shop)[1].matchAll(/'([^']+)'/g)].map(m => '/assets/images/wings/' + m[1]);
+  const catalog = readFileSync(join(root, 'src/shared/catalog.js'), 'utf8');
+  const wings = [.../wingFiles\s*=\s*\[([^\]]*)\]/.exec(catalog)[1].matchAll(/'([^']+)'/g)].map(m => '/assets/images/wings/' + m[1]);
   return {boards, wings, profileKey: /const key='([^']+)'/.exec(shop)?.[1] || 'surf.profile.v1'};
 }
 

@@ -1,5 +1,4 @@
-import {profile,characters,boards,wings} from './shop.js';
-import {previewSvg} from '../characters/stick-avatar.js';
+import '../account/account-ui.js';
 import {settings, saveSettings, VOLUME_FIELDS} from '../core/settings.js';
 import {playSound, startMatchAudio, stopMatchAudio, updateAudioVolumes} from '../audio/audio.js';
 export {settings, playSound, startMatchAudio, stopMatchAudio, updateAudioVolumes};
@@ -11,11 +10,8 @@ document.getElementById('home-settings').onclick=()=>settingsDialog.showModal();
 document.getElementById('home-battle').onclick=()=>document.getElementById('nickname').focus();
 document.querySelector('.home-brand').onclick=e=>{e.preventDefault();document.getElementById('nickname').focus();};
 document.getElementById('home-rooms').onclick=()=>document.dispatchEvent(new Event('surf:rooms'));
-document.getElementById('home-profile').onclick=()=>{
- document.getElementById('profile-preview').innerHTML=previewSvg(profile.character,profile.board);
- document.getElementById('profile-name').textContent=profile.nick||'Surfer';
- document.getElementById('profile-style').textContent=characters[profile.character]+' · '+boards[profile.board]+(wings[profile.wing]?' · '+wings[profile.wing]+' Wings':'');profileDialog.showModal();
-};
+// Perfil (invitado o cuenta): lo gestiona account/account-ui.js.
+
 document.getElementById('profile-customize').onclick=()=>{profileDialog.close();document.getElementById('shop-btn').click();};
 function apply(){document.body.classList.toggle('effects-off',!settings.effects);document.dispatchEvent(new CustomEvent('surf:settings',{detail:settings}));}
 // Sliders de volumen: muestran el % y la parte rellena; el cambio suena al instante.

@@ -3,10 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "test": "node --test test/*.test.js scripts/test-*.mjs"
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js scripts/test-*.mjs",
+    "admin": "node --disable-warning=ExperimentalWarning scripts/admin-economy.mjs"
   },
   "dependencies": {
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.67.0"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

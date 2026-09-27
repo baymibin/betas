@@ -1,5 +1,5 @@
 import {createPowerWorld,stepPowerWorld} from '../../client/src/shared/powerups.js';
-import {randomInt, createHash} from 'node:crypto';
+import {randomInt, createHash, randomUUID} from 'node:crypto';
 import uWS from 'uWebSockets.js';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -11,9 +11,43 @@ import {isMapEnabled} from '../../client/src/shared/maps.js';
 import {botLooks, createBotPlayer, createBrain, botInput, MAX_PARTICIPANTS} from '../../client/src/shared/bot-ai.js';
 import {currentManifest, fileHash, embedManifest} from './asset-manifest.js';
 import {createInputQueue, pushInput, nextInput, resetInputs} from './input-queue.js';
-import {statSync} from 'node:fs';
+import {statSync, existsSync} from 'node:fs';
+import {openDatabase, syncCatalog, loadEconomyConfig} from './db.js';
+import {createEconomy} from './economy.js';
+import {authConfig, createAuth, SESSION_COOKIE} from './auth.js';
+import {mountApi, parseCookies} from './api.js';
 
 const clientRoot = fileURLToPath(new URL('../../client/', import.meta.url));
+// Variables de entorno locales (servidor/.env, nunca en git). Ver .env.example.
+const envFile = fileURLToPath(new URL('../.env', import.meta.url));
+if (existsSync(envFile)) process.loadEnvFile(envFile);
+// ---------- Cuentas y economía ----------
+const economyConfig = loadEconomyConfig();
+const db = openDatabase();
+syncCatalog(db, economyConfig);
+const economy = createEconomy(db, economyConfig);
+const authSettings = authConfig();
+const auth = createAuth(db, economy, authSettings);
+const socketsByUser = new Map();   // surf_user_id -> conexiones /play abiertas
+// Equipamiento visible en carrera: con sesión manda la cuenta (lo equipado y poseído); como
+// invitado solo se aceptan artículos gratuitos. El nick de una cuenta es el de su perfil.
+function applyProfile(d, requested) {
+  if (d.userId) {
+    const user = economy.getUser(d.userId), eq = economy.equipped(d.userId);
+    if (user) { Object.assign(d.player, {character: eq.character, board: eq.board, wing: eq.wing, hat: eq.hat, nick: user.nickname}); return; }
+  }
+  const look = {...requested};
+  for (const slot of ['character', 'board', 'wing', 'hat']) if (!economy.canUse(null, slot, look[slot] | 0)) look[slot] = 0;
+  Object.assign(d.player, look);
+}
+function refreshEquipment(userId) { for (const ws of socketsByUser.get(userId) || []) applyProfile(ws.getUserData(), {}); }
+function startRace(room) { room.started = true; room.raceId = randomUUID(); room.humansAtStart = room.size; }
+// Recompensa de llegada, calculada aquí con el puesto real (nunca con datos del cliente).
+function rewardFinish(d, room) {
+  if (!d.userId || !room.raceId) return;
+  try { economy.rewardRace(d.userId, room.raceId, d.player.place, room.humansAtStart || room.size); }
+  catch (error) { console.error('[economy] recompensa de carrera', error); }
+}
 const screenshotsRoot = fileURLToPath(new URL('../artifacts/screenshots/', import.meta.url));
 mkdirSync(screenshotsRoot, {recursive:true});
 const rooms = new Set(); let nextId = 1, tick = 0;
@@ -44,15 +78,20 @@ function assignRoom(ws,v){
  if(mode===2){const code=String.fromCharCode(...new Uint8Array(v.buffer,v.byteOffset+14,6));room=[...rooms].find(r=>r.code===code);if(!room||room.started||room.size>=room.capacity||!isMapEnabled(room.mapId)){const e=packet(TYPE.ERROR,13);e.setUint8(12,1);ws.send(e.buffer,true);return;}}
  else {
   room=new Set();do{room.code=String(randomInt(100000,1000000));}while([...rooms].some(r=>r.code===room.code));
-  room.powerWorld=createPowerWorld();room.capacity=capacity;room.mapId=mapId;room.hostId=d.player.id;room.started=mode===0;room.finishCount=0;room.bots=[];
+  room.powerWorld=createPowerWorld();room.capacity=capacity;room.mapId=mapId;room.hostId=d.player.id;room.finishCount=0;room.bots=[];if(mode===0)startRace(room);
   room.botTarget=mode===1&&v.byteLength===22?Math.min(v.getUint8(21),capacity-1):0;rooms.add(room);
  }
  d.room=room;room.add(ws);d.player.mapId=room.mapId;d.player.countdown=room.started?90:65535;syncBots(room);broadcastRoom(room);
 }
 const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){lobbyPeers.add(ws);publishLobby();},close(ws){lobbyPeers.delete(ws);},message(ws){ws.send(publishLobby(),true);}}).ws('/play', {
   maxPayloadLength: 64, maxBackpressure: 16384, closeOnBackpressureLimit: true, idleTimeout: 30,
+  // La sesión viaja en la cookie HttpOnly del handshake: el WebSocket nunca recibe tokens.
+  upgrade(res, req, context) {
+    const session = auth.session(parseCookies(req.getHeader('cookie'))[SESSION_COOKIE]);
+    res.upgrade({userId: session?.userId || null}, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
+  },
   open(ws) {
-    const data = ws.getUserData(); data.player = createPlayer(nextId++); data.inputs = createInputQueue();
+    const data = ws.getUserData(); if(data.userId){if(!socketsByUser.has(data.userId))socketsByUser.set(data.userId,new Set());socketsByUser.get(data.userId).add(ws);} data.player = createPlayer(nextId++); applyProfile(data,{}); data.inputs = createInputQueue();
     data.room=null;
     const v = packet(TYPE.WELCOME, 17); v.setUint32(12, data.player.id, true); v.setUint8(16, PROTOCOL_VERSION); ws.send(v.buffer, true);
   },
@@ -60,19 +99,19 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
     try {
       const v = read(buffer), d = ws.getUserData(), seq = v.getUint32(4,true);
       if(binary&&v.getUint8(1)===TYPE.ROOM_REQUEST){assignRoom(ws,v);return;}
-      if(binary&&v.getUint8(1)===TYPE.ROOM_START){if(v.byteLength!==12||!d.room||d.room.hostId!==d.player.id||d.room.started)return;d.room.started=true;for(const peer of d.room){const state=peer.getUserData();state.player.countdown=90;resetInputs(state.inputs);}for(const bot of d.room.bots)bot.player.countdown=90;broadcastRoom(d.room);return;}
+      if(binary&&v.getUint8(1)===TYPE.ROOM_START){if(v.byteLength!==12||!d.room||d.room.hostId!==d.player.id||d.room.started)return;startRace(d.room);for(const peer of d.room){const state=peer.getUserData();state.player.countdown=90;resetInputs(state.inputs);}for(const bot of d.room.bots)bot.player.countdown=90;broadcastRoom(d.room);return;}
       // Cantidad de bots: solo el anfitrión y solo antes de empezar; el servidor la ajusta a la capacidad.
       if(binary&&v.getUint8(1)===TYPE.ROOM_BOTS){if(v.byteLength!==13||!d.room||d.room.hostId!==d.player.id||d.room.started)return;d.room.botTarget=Math.min(v.getUint8(12),MAX_PARTICIPANTS-1);syncBots(d.room);broadcastRoom(d.room);return;}
       // Perfil visual (skin, tabla, wings, hat, nick): al entrar y cada vez que el jugador
       // cambia su equipamiento. Viaja a todos en cada SNAPSHOT, así que los que ya estaban
       // y los que entran tarde reciben el estado real de todos (en ambas direcciones).
-      if(binary && v.getUint8(1)===TYPE.PROFILE) { Object.assign(d.player,readProfile(v));return; }
+      if(binary && v.getUint8(1)===TYPE.PROFILE) { applyProfile(d,readProfile(v));return; }
       if (!binary || v.getUint8(1) !== TYPE.INPUT || v.byteLength !== 14 || v.getInt8(12) === -128 || v.getUint8(13) > 15) throw Error('Invalid input');
       // Store scalars: uWS owns the incoming ArrayBuffer and invalidates it after this callback.
       pushInput(d.inputs,seq,v.getInt8(12)/127,v.getUint8(13)&15,performance.now());
     } catch { ws.end(1008, 'Invalid input'); }
   },
-  close(ws) {const d=ws.getUserData(),room=d.room;if(!room)return;room.delete(ws);if(!room.size){room.bots.length=0;rooms.delete(room);publishLobby();}else{if(room.hostId===d.player.id)room.hostId=[...room][0].getUserData().player.id;syncBots(room);broadcastRoom(room);}}
+  close(ws) {const d=ws.getUserData(),room=d.room;if(d.userId){const set=socketsByUser.get(d.userId);set?.delete(ws);if(!set?.size)socketsByUser.delete(d.userId);}if(!room)return;room.delete(ws);if(!room.size){room.bots.length=0;rooms.delete(room);publishLobby();}else{if(room.hostId===d.player.id)room.hostId=[...room][0].getUserData().player.id;syncBots(room);broadcastRoom(room);}}
 }).post('/save-screenshot', (res, req) => {
   let buffer = Buffer.alloc(0);
   console.log('[server] receiving screenshot data...');
@@ -148,7 +187,7 @@ setInterval(() => {
       if(room.started){const input=nextInput(d.inputs,now);if(input.buttons&4)uses.push(d.player.id);advance(d.player,input.axis,input.buttons);}
       else resetInputs(d.inputs);
       d.player.seq=d.inputs.ackSeq;
-      if(-d.player.z>=2880&&!d.player.place)d.player.place=++room.finishCount;
+      if(-d.player.z>=2880&&!d.player.place){d.player.place=++room.finishCount;rewardFinish(d,room);}
     }
     // Bots: la IA decide entradas como un jugador y se aplican con la misma física.
     const everyone=roomPlayers(room);
@@ -175,7 +214,9 @@ setInterval(() => {
 }, 4);
 let lastSnapshot = 0;
 const SNAPSHOT_BACKLOG = 4096;
+mountApi(app, {auth, economy, config: authSettings, onEquipmentChanged: refreshEquipment});
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));
+  console.log('Cuentas: Google ' + (auth.enabled('google') ? 'activo' : 'sin configurar') + ' · Discord ' + (auth.enabled('discord') ? 'activo' : 'sin configurar') + ' · pagos reales deshabilitados');
 });
