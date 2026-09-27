@@ -1,0 +1,28 @@
+{
+  "_comment": "Configuración central de la economía de Surf Salvaje. El servidor la aplica al arrancar (sin borrar datos). Precios en unidades enteras. null = sin precio definido: el paquete/producto queda INACTIVO.",
+
+  "itemPrices": {
+    "_comment": "Precio en Tablas Normales por artículo (id = categoria:indice, p. ej. \"wing:5\"). Los que no aparecen cuestan 0 = gratis para todos, como hasta ahora."
+  },
+
+  "rewards": {
+    "_comment": "Tablas Normales por carrera online terminada. Solo cuentas con sesión. minHumans evita farmear solo contra bots. dailyCap = máximo por cuenta y día (UTC).",
+    "enabled": true,
+    "finish": 20,
+    "placeBonus": [30, 20, 10],
+    "minHumans": 2,
+    "dailyCap": 300
+  },
+
+  "exchangePackages": [
+    {"id": "normal_small",  "name": "Paquete pequeño", "normalAmount": 500,  "goldPrice": null},
+    {"id": "normal_medium", "name": "Paquete mediano", "normalAmount": 1500, "goldPrice": null},
+    {"id": "normal_large",  "name": "Paquete grande",  "normalAmount": 5000, "goldPrice": null}
+  ],
+
+  "goldProducts": [
+    {"id": "gold_small",  "name": "Bolsa de Tablas de Oro",   "goldAmount": 100,  "priceMinor": null, "currency": "EUR"},
+    {"id": "gold_medium", "name": "Cofre de Tablas de Oro",   "goldAmount": 550,  "priceMinor": null, "currency": "EUR"},
+    {"id": "gold_large",  "name": "Tesoro de Tablas de Oro",  "goldAmount": 1200, "priceMinor": null, "currency": "EUR"}
+  ]
+}

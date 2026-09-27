@@ -41,3 +41,10 @@ node scripts/verify-race-live.mjs
 `verify-layout.mjs` comprueba imports, todos los recursos públicos y que el servidor no publique archivos internos. El mapa completo de la reorganización está en `docs/relocation-map.json`.
 
 Las herramientas antiguas de migración permanecen en `backups/migrations` como referencia histórica, no como comandos que deban ejecutarse otra vez.
+
+## Cuentas y economía
+
+Login con Google y Discord, monedas (Tablas Normales y Tablas de Oro), inventario y tienda con precios.
+Configuración: copia `.env.example` a `.env` y rellena las credenciales (ver `docs/AVANCES_SURF_SALVAJE.md`, secciones 8 y 9).
+Precios y recompensas: `config/economy.json`. Ajustes de saldo autorizados: `npm run admin -- users | grant | history`.
+La base de datos (SQLite) se crea sola en `servidor/data/` (no se sube a git). Requiere Node.js 22.13 o superior.

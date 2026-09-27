@@ -1,0 +1,151 @@
+/* Surf Salvaje · menú principal con acceso (referencia: menú remasterizado), monedas,
+   tienda con precios y perfil de cuenta. Se carga después de home.css y lo afina. */
+:root{--glass:#04283acc;--glass-line:#8feaf066;--gold-a:#ffe27d;--gold-b:#ffc23d;--ink-dark:#13262d;--discord:#5865F2;--discord-hover:#4752C4}
+
+/* ---------- Cabecera y marca ---------- */
+.home-online{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;background:#063845c2;border-color:#8feaf055;box-shadow:0 0 18px #3fd6e025}
+.home-online b{color:#ffd257}
+.home-online-icon{width:17px;height:17px;fill:#5ce8f0}
+.home-eyebrow{letter-spacing:5px}
+
+/* ---------- Logo SURF SALVAJE (SVG vivo, no imagen) ---------- */
+.home-play h1.home-logo{margin:8px auto 4px;transform:rotate(-3deg);text-shadow:none;font-size:0;line-height:0;letter-spacing:0}
+.home-logo svg{width:min(500px,86vw);height:auto;overflow:visible;filter:drop-shadow(0 0 22px #34c8ff40)}
+.logo-surf,.logo-salvaje{font-family:'Baloo 2',sans-serif;font-weight:800;paint-order:stroke fill;stroke-linejoin:round}
+.logo-surf{font-size:132px;letter-spacing:2px;fill:url(#logo-surf);stroke:#0b4f8a;stroke-width:13px}
+.logo-salvaje{font-size:118px;letter-spacing:1px;fill:url(#logo-salvaje);stroke:#0b3b6e;stroke-width:13px}
+.home-play>p{font-size:16px;font-weight:700;color:#f1fbfb;text-shadow:0 2px 6px #001f2c;margin:4px 0 22px}
+
+/* ---------- Panel de acceso ---------- */
+.home-play .play-box{max-width:430px;width:100%;padding:22px 26px 20px;border-radius:22px;background:linear-gradient(180deg,#05344acc,#032535d9);
+  border:1.5px solid var(--glass-line);box-shadow:0 20px 50px #001a2699,0 0 0 1px #ffffff12 inset,0 0 26px #3fd6e022;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.play-box>label{font-size:11px;letter-spacing:3px;color:#c4ecee;text-align:center;margin-bottom:10px}
+.nick-field{position:relative;margin:0 0 16px}
+.nick-field svg{position:absolute;left:16px;top:50%;width:22px;height:22px;transform:translateY(-50%);fill:#9fb6c0;pointer-events:none}
+.home-play .play-box #nickname{margin:0;height:56px;padding:0 16px 0 52px;border-radius:14px;border:1.5px solid #a6e4ee8c;background:#021e2dcc;
+  color:#fff;font:700 17px 'Baloo 2',sans-serif;text-align:left;box-shadow:inset 0 2px 6px #00000040}
+.home-play .play-box #nickname:focus{border-color:#5ce8f0;box-shadow:0 0 0 3px #5ce8f033,inset 0 2px 6px #00000040;outline:none}
+.home-play .play-box #nickname[readonly]{cursor:default}
+.home-play .play-box #start-btn{display:flex;align-items:center;justify-content:center;position:relative;height:64px;padding:0 24px;border-radius:14px;
+  border:1px solid #fff0b0;background:linear-gradient(180deg,var(--gold-a),var(--gold-b));color:var(--ink-dark);font:800 28px 'Baloo 2',sans-serif;letter-spacing:.5px;
+  box-shadow:0 0 24px #ffc83c80,0 8px 18px #00121c66,inset 0 2px 0 #fffbe0;transition:transform .15s,box-shadow .15s,filter .15s}
+.home-play .play-box #start-btn span{position:absolute;right:24px;float:none;font-size:26px}
+.home-play .play-box #start-btn:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 0 32px #ffc83ca6,0 10px 22px #00121c66,inset 0 2px 0 #fffbe0}
+.home-play .play-box #start-btn:active{transform:translateY(1px)}
+
+.auth-divider{display:flex;align-items:center;gap:12px;margin:18px 0 14px;font-size:11px;font-weight:800;letter-spacing:2.4px;color:#cfe8ee}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,#ffffff55)}
+.auth-divider::after{background:linear-gradient(90deg,#ffffff55,transparent)}
+.auth-buttons{display:flex;flex-direction:column;gap:10px}
+.auth-btn{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:50px;padding:0 54px;border-radius:12px;border:1px solid transparent;
+  font:700 16px 'Baloo 2',sans-serif;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}
+.auth-btn svg{position:absolute;left:18px;width:24px;height:24px}
+.auth-google{background:#fff;color:#1f2a33;border-color:#dfe7ec;box-shadow:0 4px 12px #00121c40}
+.auth-google:hover{background:#f3f7fa;box-shadow:0 6px 18px #00121c55;transform:translateY(-1px)}
+.auth-discord{background:var(--discord);color:#fff;box-shadow:0 4px 14px #1b1f6b55}
+.auth-discord:hover{background:var(--discord-hover);box-shadow:0 6px 20px #1b1f6b77;transform:translateY(-1px)}
+.auth-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.auth-btn:focus-visible,.home-play .play-box #start-btn:focus-visible{outline:3px solid #5ce8f0;outline-offset:3px}
+
+/* Sesión iniciada: ocupa el lugar de los dos botones con la misma altura aproximada. */
+.auth-account{display:grid;grid-template-columns:1fr auto;gap:10px 12px;align-items:center;padding:12px 14px;border-radius:14px;background:#021e2d99;border:1px solid #8feaf040}
+.auth-account[hidden]{display:none}
+.auth-account-main{display:flex;align-items:center;gap:11px;min-width:0;background:none;border:0;padding:0;color:#fff;cursor:pointer;text-align:left;font:inherit}
+.auth-account-main img{width:42px;height:42px;border-radius:50%;object-fit:cover;background:#0b4b5e;border:2px solid #5ce8f0;flex:none}
+.auth-account-text{display:flex;flex-direction:column;min-width:0}
+.auth-account-text strong{font-size:17px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.auth-account-text small{font-size:12px;color:#9fd9df}
+.auth-wallet{display:flex;gap:8px;grid-column:1/-1}
+.auth-logout{grid-column:2;grid-row:1;background:none;border:0;color:#bde8e8;font:700 12px 'Baloo 2',sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.auth-message{min-height:0;margin:10px 0 0;font-size:13px;font-weight:700;color:#aef4df;text-align:center}
+.auth-message:empty{display:none}
+.auth-message.error{color:#ffb9a3}
+
+/* Monedas (reutilizado en menú, tienda y perfil). */
+.coin-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px 4px 6px;border-radius:999px;background:#03202fcc;border:1px solid #5ce8f066;color:#fff;font:800 15px 'Baloo 2',sans-serif;font-variant-numeric:tabular-nums}
+.coin-chip img{width:26px;height:26px}
+.coin-chip.gold{border-color:#ffd25780;box-shadow:0 0 12px #ffc83c33}
+.coin-chip.gold b{color:#ffe07a}
+.coin-inline{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-variant-numeric:tabular-nums}
+.coin-inline img{width:20px;height:20px}
+
+/* ---------- Datos y mejor marca ---------- */
+.home-play .home-facts{justify-content:center;gap:38px;margin-top:24px;font-size:14px;color:#dff3f3}
+.home-facts span{display:inline-flex;align-items:center;gap:7px}
+.home-facts svg{width:26px;height:26px;fill:#ffd257;filter:drop-shadow(0 0 6px #ffc83c66)}
+.home-facts span:last-child svg{width:30px}
+.home-facts b{color:#fff;font-size:21px;margin:0}
+.home-facts small{font-size:14px;font-weight:600}
+.home-play .best{margin-top:16px;font-size:16px;font-weight:800;color:#ffd257;text-shadow:0 0 12px #ffc83c55}
+.practice-link{display:block;margin:10px auto 0;background:none;border:0;color:#bde8e8;cursor:pointer;text-decoration:underline;text-underline-offset:4px;font:700 13px 'Baloo 2',sans-serif}
+
+/* Fondo más luminoso (como la referencia) y bloque central algo a la izquierda para dejar ver a los surfistas. */
+.surf-home::before{background:linear-gradient(90deg,#03304088 0%,#04384930 42%,#053e4500 70%),linear-gradient(0deg,#022c3ca8,transparent 32%)}
+@media(min-width:1200px) and (min-height:741px){.home-play{margin:auto auto auto max(0px,calc(42% - 250px));max-width:500px;text-align:center}.home-play .play-box{margin:0 auto}}
+.auth-btn.is-unconfigured{cursor:help}
+
+/* ---------- Barra lateral: selección con brillo turquesa ---------- */
+.nav-item.selected{background:linear-gradient(180deg,#0c5a6c,#063b4d);border:1.5px solid #5ce8f0;box-shadow:0 0 18px #3fd6e055,inset 0 0 14px #5ce8f022}
+.home-brand span{color:#5ce8f0}
+
+@media(max-height:740px) and (min-width:701px){
+  .home-logo svg{width:min(380px,70vw)}.home-play .play-box{padding:16px 22px}.home-play .play-box #start-btn{height:54px;font-size:24px}
+  .home-play .play-box #nickname{height:48px}.auth-btn{height:44px}.auth-divider{margin:12px 0 10px}.home-play .home-facts{margin-top:16px}
+}
+@media(max-width:700px){.home-logo svg{width:min(330px,70vw)}.home-play .home-facts{gap:18px}.home-play .play-box{padding:16px}}
+@media(max-height:530px){.home-logo svg{width:220px}.auth-divider{margin:8px 0}.auth-btn{height:38px}.home-play .play-box #start-btn{height:44px;font-size:20px}}
+
+/* ---------- La tiendita: monedero, precios y estados ---------- */
+.shop-wallet{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.shop-wallet .shop-login{background:#ffffff14;border:1px solid #ffffff33;color:#fff;border-radius:999px;padding:6px 14px;font:700 13px 'Baloo 2',sans-serif;cursor:pointer}
+.shop-item .shop-price{display:inline-flex;align-items:center;gap:4px;color:#fff;font-weight:800}
+.shop-item .shop-price img{width:18px;height:18px}
+.shop-item.is-locked .shop-item-art{filter:saturate(.8)}
+.shop-item-equip.is-buy{background:linear-gradient(180deg,var(--gold-a),var(--gold-b));color:var(--ink-dark);border-color:#fff0b0}
+.shop-item-equip.is-poor{background:#3a1f24;color:#ffb9a3;border-color:#ff8a7a66}
+#shop-detail-equip.is-buy{background:linear-gradient(180deg,var(--gold-a),var(--gold-b));color:var(--ink-dark)}
+#shop-detail-equip.is-poor{background:#4a2129;color:#ffd0c4}
+.shop-note{margin:6px 0 0;font-size:12px;color:#ffb9a3;min-height:0}
+.shop-note:empty{display:none}
+.coins-panel{display:flex;flex-direction:column;gap:12px}
+.coins-panel h3{margin:4px 0 0;font-size:15px;letter-spacing:1.5px;color:#9ff4e6}
+.coins-panel p{margin:0;font-size:13px;color:#bcd8dd}
+.coin-pack{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px;border-radius:16px;background:#05344a99;border:1px solid #8feaf044}
+.coin-pack img{width:46px;height:46px}
+.coin-pack strong{display:block;font-size:16px}
+.coin-pack small{color:#bcd8dd}
+.coin-pack button{min-width:128px;padding:10px 14px;border-radius:12px;border:1px solid #fff0b0;background:linear-gradient(180deg,var(--gold-a),var(--gold-b));color:var(--ink-dark);font:800 14px 'Baloo 2',sans-serif;cursor:pointer}
+.coin-pack button:disabled{background:#ffffff1a;color:#cfe3e7;border-color:#ffffff33;cursor:not-allowed}
+.coin-pack.gold{border-color:#ffd25766}
+
+/* ---------- Perfil ---------- */
+#profile-dialog.account-profile{width:min(640px,94vw);max-height:90dvh;overflow:auto;text-align:left}
+.account-head{display:flex;gap:16px;align-items:center;margin:8px 0 14px}
+.account-head img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #5ce8f0;background:#0b4b5e}
+.account-head .account-id{font-size:11px;color:#9fc3cd;word-break:break-all}
+.account-nick{display:flex;gap:8px;margin:6px 0}
+.account-nick input{flex:1;min-width:0;padding:8px 12px;border-radius:10px;border:1px solid #ffffff40;background:#042a36;color:#fff;font:700 15px 'Baloo 2',sans-serif}
+.account-nick button,.account-section button{padding:8px 14px;border-radius:10px;border:1px solid #8feaf066;background:#0b4f62;color:#fff;font:700 13px 'Baloo 2',sans-serif;cursor:pointer}
+.account-section{margin:14px 0 0;padding:14px;border-radius:14px;background:#021e2d80;border:1px solid #8feaf033}
+.account-section h3{margin:0 0 10px;font-size:12px;letter-spacing:2px;color:#9ff4e6}
+.account-providers{display:grid;gap:8px}
+.account-provider{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px}
+.account-provider .linked{color:#aef4df;font-size:12px}
+.account-wallet{display:flex;gap:10px;flex-wrap:wrap}
+.account-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px;max-height:190px;overflow:auto}
+.account-list li{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border-radius:9px;background:#ffffff0d}
+.account-list .plus{color:#aef4df}.account-list .minus{color:#ffb9a3}
+.account-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.account-actions .danger{background:#4a2129;border-color:#ff8a7a66}
+
+/* Tienda: 5 pestañas (Conseguir monedas) y monedero en la cabecera. */
+.shop-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.shop-header .shop-wallet{margin-left:auto;align-self:center}
+.shop-tabs [data-category="coins"] img{width:24px;height:24px}
+@media(max-width:540px){.shop-header .shop-wallet .coin-chip{font-size:12px;padding:2px 8px 2px 4px}.shop-header .shop-wallet .coin-chip img{width:18px;height:18px}}
+.auth-buttons[hidden]{display:none}
+.shop-tabs{grid-template-columns:repeat(4,minmax(0,1fr)) minmax(0,1.45fr)}
+.shop-tabs button{font-size:12px;gap:5px;padding:10px 4px;overflow:hidden;text-overflow:ellipsis}
+#shop-grid .coins-panel{grid-column:1/-1}
+#coin-packs,#gold-products{display:grid;gap:10px}
+.coin-pack .coin-inline img{width:18px;height:18px}.coin-pack .coin-inline{vertical-align:middle}

@@ -1,2 +1,7 @@
 node_modules/
 *.log
+# Base de datos local, secreto de sesión generado y variables privadas
+data/
+.env
+.env.*
+!.env.example
