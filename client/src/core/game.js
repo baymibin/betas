@@ -1561,7 +1561,7 @@ function startGame(){
   resetGame();
   const mapId = online ? net.player.mapId : (PARAMS.has('map') ? parseInt(PARAMS.get('map')) : 0);
   buildMap(mapId);raceUI.start(mapId);lastJump=0;lastRamp=0;lapsDone=0;trickStart=-10;
-  localPowerWorld=createPowerWorld();powerView.reset();localPlayer={...createPlayer(0),mapId,countdown:90};localAccumulator=0;localButtons=0;
+  localPowerWorld=createPowerWorld();powerView.reset();localPlayer={...createPlayer(0),mapId,countdown:90};Object.assign(localPrev,{x:localPlayer.x,y:localPlayer.y,z:localPlayer.z});localAccumulator=0;localButtons=0;
   // Modo solitario: 1 humano + 7 bots, creados solo al empezar la carrera (en línea los simula el servidor).
   clearPracticeBots();
   if(!online){
@@ -1601,7 +1601,7 @@ const net = new SurfNetwork(text => { networkStatus.textContent = text; if(onlin
 const rivals = new Map();
 let avatar=null,avatarAppearance='';const raceUI=createRaceUI();let lastRamp=0,lapsDone=0;let lastJump=0,trickStart=-10,trickType=0;
 let localPowerWorld=createPowerWorld();const powerView=createPowerView(BABYLON,scene,()=>{if(!running)return;if(online)net.buttons|=4;else localButtons|=4;});
-let localPlayer=createPlayer(0),localAccumulator=0,localButtons=0;
+let localPlayer=createPlayer(0),localAccumulator=0,localButtons=0;const localPrev={x:0,y:0,z:0};
 let practiceBots=[],practiceFinish=0;
 function clearPracticeBots(){practiceBots=[];practiceFinish=0;for(const [id,mesh] of rivals){mesh.disposeAvatar();rivals.delete(id);}}
 // Estado visual de los bots del solitario, interpolado entre ticks de simulación (30 Hz).
@@ -1694,8 +1694,9 @@ function syncMovement(p,dt,axis) {
   if(p.impulse < 0) avatar?.triggerImpact?.();
   strafe+=(axis-strafe)*Math.min(1,dt*8);
   if(wasAir>.05 && p.y===0) {landPulse=1;spray.manualEmitCount=45;}
-  playerRoot.position.x+=(p.x-playerRoot.position.x)*(1-Math.exp(-20*dt));
-  playerRoot.position.z+=(p.z-playerRoot.position.z)*(1-Math.exp(-20*dt));
+  // p ya llega interpolado entre ticks: el suavizado puede ser más rápido (menos retraso visual).
+  playerRoot.position.x+=(p.x-playerRoot.position.x)*(1-Math.exp(-30*dt));
+  playerRoot.position.z+=(p.z-playerRoot.position.z)*(1-Math.exp(-30*dt));
   lateralOffset=p.x;distance=-p.z;airY=Math.max(p.y,rampHeight(p.x,p.z));isJumping=p.y>0;airClock=isJumping?airClock+dt:0;
   boostValue=p.energy;boostActive=p.turboTicks>0 || (p.slipActive>0&&p.slipTicks>0) || p.impulse>0 || ((boostHeld || elapsed<touchBoostUntil)&&p.energy>.03&&p.impulse>=0);speed=playerSpeed(p,boostActive,throttleHeld);animT+=dt*speed;
   if(boostActive&&!previousBoost&&p.impulse<=0)showTrick('TURBO');
@@ -1706,6 +1707,7 @@ function updatePractice(dt) {
   const axis=inputAxis(localPlayer);localAccumulator=Math.min(.15,localAccumulator+dt);
   while(localAccumulator>=DT) {
     const everyone=[localPlayer,...practiceBots.map(b=>b.player)],uses=localButtons&4?[localPlayer.id]:[];
+    localPrev.x=localPlayer.x;localPrev.y=localPlayer.y;localPrev.z=localPlayer.z;
     advance(localPlayer,axis,localButtons | ((boostHeld || elapsed<touchBoostUntil)?2:0) | (throttleHeld?8:0));
     if(-localPlayer.z>=LAP_LENGTH*TOTAL_LAPS&&!localPlayer.place&&practiceBots.length)localPlayer.place=++practiceFinish;
     // Bots: mismas reglas que el jugador (advance + stepPowerWorld); la IA solo elige las entradas.
@@ -1718,7 +1720,9 @@ function updatePractice(dt) {
     }
     stepPowerWorld(localPowerWorld,everyone,uses);localButtons=0;localAccumulator-=DT;
   }
-  syncMovement(localPlayer,dt,axis);
+  // Igual que los bots: el jugador se dibuja interpolado entre ticks (30 Hz) para no avanzar a saltos.
+  const alpha=localAccumulator/DT;
+  syncMovement({...localPlayer,x:localPrev.x+(localPlayer.x-localPrev.x)*alpha,y:localPrev.y+(localPlayer.y-localPrev.y)*alpha,z:localPrev.z+(localPlayer.z-localPrev.z)*alpha},dt,axis);
   if(practiceBots.length)drawRivals(practiceBotStates(localAccumulator/DT),dt);
 }
 window.addEventListener('mousedown',e=>{if(e.button===2&&running){lookBack=true;e.preventDefault();}});
@@ -2203,7 +2207,7 @@ function step(){
    avatar.performTrick?.(trickType,Math.max(0,(elapsed-trickStart)/.8));
   }
   for(const rival of rivals.values()){rival.animate(elapsed,rival.remoteSteer||0,rival.remoteAir||0);if(rival.trickAt!==undefined)rival.performTrick?.(rival.trickKind,(elapsed-rival.trickAt)/.8);}
-  powerView.update(online?net.authoritative:localPlayer,online?net.powerWorld:localPowerWorld,online?net.players:[localPlayer,...practiceBots.map(b=>b.player)],elapsed,running,avatar,rivals);
+  powerView.update(online?(net.player||net.authoritative):localPlayer,online?net.powerWorld:localPowerWorld,online?net.players:[localPlayer,...practiceBots.map(b=>b.player)],elapsed,running,avatar,rivals);
   trackView.render({lookBack,player:playerRoot,camera,decor:decorItems,course:courseView.nodes,rivals:[...rivals.values()],wakes:wakeParts.filter(w=>w.mesh.isEnabled()).map(w=>w.mesh),sky:skylineRoot,sun,waterMaterial:oceanMat,air:airY,dt,sample:(x,z)=>oceanSample(x,z,waveTime,_samp).y},()=>scene.render());
 }
 

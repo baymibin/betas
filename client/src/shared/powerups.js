@@ -1,4 +1,4 @@
-import {courseSection,SURF_LIMIT,LAP_LENGTH} from './course.js';
+import {courseSection,SURF_LIMIT,LAP_LENGTH,TOTAL_LAPS} from './course.js';
 export const ITEMS=['','Bendición Tiki','Ola cohete','Coco buscador','Remolino','Pulso de marea','Espuma cegadora','Salto del delfín','Estela del líder'];
 export function makeBoxes(seed=1){
  let state=seed>>>0;const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
@@ -14,20 +14,36 @@ export function hurt(p,ticks){if(p.shieldTicks>0||p.guardTicks>0)return false;p.
 // punto de la vuelta (el circuito es cerrado: la vuelta 2 pasa por el mismo lugar que la 1).
 function lapGap(p,e){let dz=(((-p.z)%LAP_LENGTH+LAP_LENGTH)%LAP_LENGTH)-(((-e.z)%LAP_LENGTH+LAP_LENGTH)%LAP_LENGTH);if(dz>LAP_LENGTH/2)dz-=LAP_LENGTH;if(dz<-LAP_LENGTH/2)dz+=LAP_LENGTH;return Math.hypot(p.x-e.x,dz);}
 const ahead=(p,active)=>active.filter(q=>q.id!==p.id&&q.z<p.z).sort((a,b)=>b.z-a.z)[0];
+// Efecto sobre uno mismo de Tiki (1), Ola cohete (2) y Delfín (7). Lo usan el servidor
+// (stepPowerWorld) y la predicción del cliente, para aplicar exactamente la misma regla.
+// Devuelve false si no se puede usar ahora (delfín en el aire).
+export function applySelfPower(p,kind){
+ if(kind===1){p.shieldTicks=240;p.slowTicks=0;p.foamTicks=0;if(p.impulse<0)p.impulse=0;return true;}
+ if(kind===2){p.turboTicks=90;p.slowTicks=0;return true;}
+ if(kind===7){if(p.y>=1.3)return false;p.vy=11;p.y=Math.max(.1,p.y);p.dolphinTicks=60;p.jumps++;p.trick=(p.jumps+p.id)%5;p.slowTicks=0;return true;}
+ return false;
+}
+// Predicción local del uso de la habilidad propia: solo las que no dependen de otros jugadores.
+// Mismas condiciones que stepPowerWorld (participante activo y con la habilidad en la mano).
+export function predictSelfPower(p){
+ const kind=p.heldItem;
+ if(!kind||p.countdown!==0||p.place||-p.z>=LAP_LENGTH*TOTAL_LAPS)return;
+ if(kind!==1&&kind!==2&&kind!==7)return;
+ if(applySelfPower(p,kind))p.heldItem=0;
+}
 export function stepPowerWorld(world,players,uses=[],random=Math.random){
  const active=players.filter(p=>p.countdown===0&&!p.place&&-p.z<2880);
  for(const p of active){
   if(uses.includes(p.id)&&p.heldItem){
    const kind=p.heldItem;p.heldItem=0;
    const spawn=(target=0,ttl=30)=>world.entities.push({id:world.nextId++,kind,owner:p.id,target,x:p.x,z:p.z,y:p.y+.7,ttl});
-   if(kind===1){p.shieldTicks=240;p.slowTicks=0;p.foamTicks=0;if(p.impulse<0)p.impulse=0;}
-   if(kind===2){p.turboTicks=90;p.slowTicks=0;}
+   if(kind===1||kind===2)applySelfPower(p,kind);
    if(kind===3){const target=ahead(p,active);if(target)spawn(target.id,120);else p.heldItem=kind;}
    // Remolino: queda fijo en el agua hasta que alguien lo atraviese (no caduca ni depende de la vuelta).
    if(kind===4){spawn(0,65000);Object.assign(world.entities.at(-1),{z:p.z+2,y:.1});}
    if(kind===5){spawn(0,65000);Object.assign(world.entities.at(-1),{z:p.z+2.5,y:1.1,age:0});for(const q of active)if(q.id!==p.id&&!q.shieldTicks&&!q.guardTicks&&Math.hypot(q.x-p.x,q.z-p.z)<10){const limit=SURF_LIMIT-(q.mapId||0)*.4;q.x=Math.max(-limit,Math.min(limit,q.x+(q.x>=p.x?2.5:-2.5)));q.guardTicks=30;}}
    if(kind===6)spawn(0,90);
-   if(kind===7){if(p.y<1.3){p.vy=11;p.y=Math.max(.1,p.y);p.dolphinTicks=60;p.jumps++;p.trick=(p.jumps+p.id)%5;p.slowTicks=0;}else p.heldItem=kind;}
+   if(kind===7&&!applySelfPower(p,kind))p.heldItem=kind;
    if(kind===8){const target=ahead(p,active);if(target){p.slipTicks=150;p.slipTarget=target.id;}else p.heldItem=kind;}
   }
   const target=active.find(q=>q.id===p.slipTarget);p.slipActive=p.slipTicks>0&&target&&p.z-target.z>0&&p.z-target.z<45&&Math.abs(p.x-target.x)<3?1:0;
