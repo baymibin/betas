@@ -2,10 +2,10 @@ import {RemoteTimeline} from './remote-timeline.js';
 import {TYPE,readPowerWorld,read,input,states,profilePacket,roomRequest,readRoom,packet,roomBots,PROTOCOL_VERSION} from '../shared/protocol.js';
 import {advance,DT} from '../shared/simulation.js';
 export class SurfNetwork {
-  constructor(status) { this.status=status; this.pending=[]; this.remote=[]; this.buttons=0; this.axis=0; this.seq=0; }
+  constructor(status) { this.status=status; this.pending=[]; this.remote=[]; this.buttons=0; this.axis=0; this.seq=0; this.errorX=0; this.errorZ=0; }
   connect(profile,options={mode:1,mapId:0}) {
     this.close();this.room=null;this.options=options;this.powerWorld={taken:new Set(),entities:[]};this.timeline=new RemoteTimeline();
-    this.pending=[]; this.remote=[]; this.seq=0; this.buttons=0; this.player=null;this.authoritative=null;
+    this.pending=[]; this.remote=[]; this.seq=0; this.buttons=0; this.player=null;this.authoritative=null;this.errorX=0;this.errorZ=0;
     return new Promise((resolve,reject) => {
       const ws=this.ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/play`);
       ws.binaryType='arraybuffer';
@@ -27,10 +27,14 @@ export class SurfNetwork {
           const list=states(v), own=list.find(p=>p.id===this.id);
           if(!own) return;
           this.pending=this.pending.filter(c=>c.seq>own.seq);
+          const before=this.player;
           this.players=list;this.authoritative={...own};this.player={...own};
           for(const c of this.pending) advance(this.player,c.axis,c.buttons);
+          // Corrección del servidor (poderes que el cliente no predice, p. ej. el pulso de un bot):
+          // se guarda como error visual que se disipa en unos 150 ms en vez de teletransportar.
+          if(before){this.errorX+=before.x-this.player.x;this.errorZ+=before.z-this.player.z;
+            if(Math.hypot(this.errorX,this.errorZ)>8){this.errorX=0;this.errorZ=0;}}
           this.timeline.push(v.getUint32(8,true),list.filter(p=>p.id!==this.id),performance.now());this.remote=this.timeline.frames;
-          if(this.remote.length>10) this.remote.shift();
           this.onRoom?.(this.room,list);
           this.status(`ONLINE  -  ${list.length}/${this.room?.capacity||8} SURFISTAS`);
           if(!this.timer) { clearTimeout(timeout); this.timer=setInterval(()=>this.update(),DT*1000); resolve(); }
@@ -46,6 +50,10 @@ export class SurfNetwork {
     const c={seq:++this.seq,axis:Math.round(this.axis*127)/127,buttons:this.buttons | (this.boostHeld?2:0) | (this.throttleHeld?8:0)}; this.buttons=0;
     this.pending.push(c); advance(this.player,c.axis,c.buttons); this.ws.send(input(c.seq,c.axis,c.buttons));
   }
+  // Estado a dibujar: la predicción más el error de corrección pendiente, que decae con dt.
+  view(dt){const k=Math.exp(-20*dt);this.errorX*=k;this.errorZ*=k;
+    if(Math.abs(this.errorX)<1e-3&&Math.abs(this.errorZ)<1e-3){this.errorX=0;this.errorZ=0;return this.player;}
+    return {...this.player,x:this.player.x+this.errorX,z:this.player.z+this.errorZ};}
   // Reenvía el perfil visual (skin, tabla, wings, hat) si el jugador cambia su equipamiento
   // estando conectado; el servidor lo propaga a todos en el siguiente SNAPSHOT.
   sendProfile(profile){if(this.ws?.readyState===1&&this.id!==undefined&&!this.legacyServer)this.ws.send(profilePacket(profile));}
