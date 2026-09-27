@@ -10,6 +10,7 @@ import {DT, createPlayer, advance} from '../../client/src/shared/simulation.js';
 import {isMapEnabled} from '../../client/src/shared/maps.js';
 import {botLooks, createBotPlayer, createBrain, botInput, MAX_PARTICIPANTS} from '../../client/src/shared/bot-ai.js';
 import {currentManifest, fileHash, embedManifest} from './asset-manifest.js';
+import {createInputQueue, pushInput, nextInput, resetInputs} from './input-queue.js';
 import {statSync} from 'node:fs';
 
 const clientRoot = fileURLToPath(new URL('../../client/', import.meta.url));
@@ -51,15 +52,15 @@ function assignRoom(ws,v){
 const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){lobbyPeers.add(ws);publishLobby();},close(ws){lobbyPeers.delete(ws);},message(ws){ws.send(publishLobby(),true);}}).ws('/play', {
   maxPayloadLength: 64, maxBackpressure: 16384, closeOnBackpressureLimit: true, idleTimeout: 30,
   open(ws) {
-    const data = ws.getUserData(); data.player = createPlayer(nextId++); data.queue = []; data.lastSeq = 0;
-    data.room=null;data.axis=0;data.buttons=0;data.updatedAt=performance.now();
+    const data = ws.getUserData(); data.player = createPlayer(nextId++); data.inputs = createInputQueue();
+    data.room=null;
     const v = packet(TYPE.WELCOME, 17); v.setUint32(12, data.player.id, true); v.setUint8(16, PROTOCOL_VERSION); ws.send(v.buffer, true);
   },
   message(ws, buffer, binary) {
     try {
       const v = read(buffer), d = ws.getUserData(), seq = v.getUint32(4,true);
       if(binary&&v.getUint8(1)===TYPE.ROOM_REQUEST){assignRoom(ws,v);return;}
-      if(binary&&v.getUint8(1)===TYPE.ROOM_START){if(v.byteLength!==12||!d.room||d.room.hostId!==d.player.id||d.room.started)return;d.room.started=true;for(const peer of d.room){const state=peer.getUserData();state.player.countdown=90;state.axis=0;state.buttons=0;}for(const bot of d.room.bots)bot.player.countdown=90;broadcastRoom(d.room);return;}
+      if(binary&&v.getUint8(1)===TYPE.ROOM_START){if(v.byteLength!==12||!d.room||d.room.hostId!==d.player.id||d.room.started)return;d.room.started=true;for(const peer of d.room){const state=peer.getUserData();state.player.countdown=90;resetInputs(state.inputs);}for(const bot of d.room.bots)bot.player.countdown=90;broadcastRoom(d.room);return;}
       // Cantidad de bots: solo el anfitrión y solo antes de empezar; el servidor la ajusta a la capacidad.
       if(binary&&v.getUint8(1)===TYPE.ROOM_BOTS){if(v.byteLength!==13||!d.room||d.room.hostId!==d.player.id||d.room.started)return;d.room.botTarget=Math.min(v.getUint8(12),MAX_PARTICIPANTS-1);syncBots(d.room);broadcastRoom(d.room);return;}
       // Perfil visual (skin, tabla, wings, hat, nick): al entrar y cada vez que el jugador
@@ -67,10 +68,8 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
       // y los que entran tarde reciben el estado real de todos (en ambas direcciones).
       if(binary && v.getUint8(1)===TYPE.PROFILE) { Object.assign(d.player,readProfile(v));return; }
       if (!binary || v.getUint8(1) !== TYPE.INPUT || v.byteLength !== 14 || v.getInt8(12) === -128 || v.getUint8(13) > 15) throw Error('Invalid input');
-      if(seq<=d.lastSeq)return;
-      d.lastSeq = seq;
       // Store scalars: uWS owns the incoming ArrayBuffer and invalidates it after this callback.
-      d.axis=v.getInt8(12)/127;d.buttons=(d.buttons&5)|(v.getUint8(13)&15);d.updatedAt=performance.now();
+      pushInput(d.inputs,seq,v.getInt8(12)/127,v.getUint8(13)&15,performance.now());
     } catch { ws.end(1008, 'Invalid input'); }
   },
   close(ws) {const d=ws.getUserData(),room=d.room;if(!room)return;room.delete(ws);if(!room.size){room.bots.length=0;rooms.delete(room);publishLobby();}else{if(room.hostId===d.player.id)room.hostId=[...room][0].getUserData().player.id;syncBots(room);broadcastRoom(room);}}
@@ -145,9 +144,10 @@ setInterval(() => {
   while (accumulator >= DT && steps++ < 5) {
     for (const room of rooms) {const uses=[];for (const ws of room) {
       const d=ws.getUserData();
-      const fresh=now-d.updatedAt<500;
-      if(fresh&&(d.buttons&4))uses.push(d.player.id);
-      if(room.started)advance(d.player,fresh?d.axis:0,fresh?d.buttons:0);d.buttons&=(2|8);d.player.seq=d.lastSeq;
+      // Un input de la cola por tick (ver input-queue.js): el mismo que el cliente ya predijo.
+      if(room.started){const input=nextInput(d.inputs,now);if(input.buttons&4)uses.push(d.player.id);advance(d.player,input.axis,input.buttons);}
+      else resetInputs(d.inputs);
+      d.player.seq=d.inputs.ackSeq;
       if(-d.player.z>=2880&&!d.player.place)d.player.place=++room.finishCount;
     }
     // Bots: la IA decide entradas como un jugador y se aplican con la misma física.
