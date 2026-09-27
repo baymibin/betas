@@ -167,11 +167,14 @@ setInterval(() => {
     lastSnapshot = tick;
     for (const room of rooms) {
       const buffer = snapshot(roomPlayers(room),tick),powers=powerWorldPacket(room.powerWorld,tick);
-      for (const ws of room) if (ws.getBufferedAmount() === 0){ws.send(buffer,true);ws.send(powers,true);}
+      // Solo se omite el snapshot si el cliente acumula varios sin enviar; con ===0 bastaba un byte
+      // pendiente para perder el tick entero y los rivales daban tirones.
+      for (const ws of room) if (ws.getBufferedAmount() < SNAPSHOT_BACKLOG){ws.send(buffer,true);ws.send(powers,true);}
     }
   }
 }, 4);
 let lastSnapshot = 0;
+const SNAPSHOT_BACKLOG = 4096;
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje: http://localhost:' + (process.env.PORT || 3000));

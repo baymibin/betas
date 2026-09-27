@@ -196,7 +196,24 @@ export function createPowerView(B, scene, use) {
   const glow = new B.GlowLayer('power-glow', scene, {blurKernelSize: 24, mainTextureRatio: 0.35});
   glow.intensity = 0.55;
 
-  const registered = new WeakSet(), glowing = new Set();
+  const glowing = new Set(), glowMeshes = new Map();
+  const GLOW_RANGE = 90;
+  // Mete o saca las mallas de un avatar del GlowLayer (solo mientras tiene un poder activo).
+  function setAvatarGlow(root, on) {
+    if (on === glowMeshes.has(root)) return;
+    if (on) {
+      const meshes = root.getChildMeshes().filter(m => !m.metadata?.excludePowerGlow);
+      meshes.forEach(m => glow.addIncludedOnlyMesh(m));
+      glowMeshes.set(root, meshes);
+      if (!root.__glowDisposeHook) {
+        root.__glowDisposeHook = true;
+        root.onDisposeObservable.add(() => { setAvatarGlow(root, false); glowing.delete(root); });
+      }
+    } else {
+      glowMeshes.get(root).forEach(m => glow.removeIncludedOnlyMesh(m));
+      glowMeshes.delete(root);
+    }
+  }
 
   // Cajas sorpresa: cubos que giran con el arte original en cada cara
   // (power-cube-holo.webp = caja sorpresa, power-5.webp = caja trampa roja).
@@ -252,6 +269,7 @@ export function createPowerView(B, scene, use) {
     for (const m of fragments)if(m.isEnabled())m.setEnabled(false);
     for (const root of glowing) if (!root.isDisposed()) root.setPowerGlow?.(0);
     glowing.clear();
+    for (const root of [...glowMeshes.keys()]) setAvatarGlow(root, false);
   }
 
   // 8 Legible & Stylized In-World Powerup Entities
@@ -353,12 +371,6 @@ export function createPowerView(B, scene, use) {
         hide();
         return;
       }
-      const needsGlow = settings.effects && settings.quality !== 'low' && (
-        (players || []).some(q => q.shieldTicks || q.turboTicks || q.dolphinTicks || q.slipActive) ||
-        world.entities.length > 0
-      );
-      if(glow.isEnabled!==needsGlow)glow.isEnabled=needsGlow;
-
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
       const boxes = world.boxes || [];
@@ -510,24 +522,26 @@ export function createPowerView(B, scene, use) {
         }
       }
 
-      // Avatar & Rivals aura synchronization
+      // Avatar & Rivals aura synchronization. Solo los avatares con poder activo entran en el
+      // GlowLayer: con 7 bots, meter siempre los 8 avatares obligaba a redibujarlos todos en la
+      // pasada de brillo en cada frame.
+      const fancy = settings.effects && settings.quality !== 'low';
+      let glowNearby = false;
       for (const q of players || []) {
         const root = q.id === p.id ? avatar : rivals?.get(q.id);
         if (!root) continue;
         const kind = q.shieldTicks ? 1 : q.turboTicks ? 2 : q.dolphinTicks ? 7 : q.slipActive ? 8 : 0;
-        if (!registered.has(root)) {
-          const meshes = root.getChildMeshes().filter(m => !m.metadata?.excludePowerGlow);
-          meshes.forEach(m => glow.addIncludedOnlyMesh(m));
-          root.onDisposeObservable.add(() => {
-            meshes.forEach(m => glow.removeIncludedOnlyMesh(m));
-            glowing.delete(root);
-          });
-          registered.add(root);
-        }
-        root.setPowerGlow?.(kind, settings.effects && settings.quality !== 'low' ? 1 : 0.35);
+        root.setPowerGlow?.(kind, fancy ? 1 : 0.35);
+        const shine = !!kind && fancy && root.isEnabled() && Math.abs(q.z - p.z) < GLOW_RANGE;
+        setAvatarGlow(root, shine);
+        if (shine) glowNearby = true;
         if (kind) glowing.add(root);
         else glowing.delete(root);
       }
+      // El GlowLayer (pasada extra + desenfoque) solo se enciende si hay algo cerca que brille.
+      // Remolinos y trampas (4 y 5) no brillan: al no caducar lo dejaban encendido toda la carrera.
+      const needsGlow = fancy && (glowNearby || world.entities.some(e => e.kind !== 4 && e.kind !== 5 && Math.abs(e.z - p.z) < GLOW_RANGE));
+      if(glow.isEnabled!==needsGlow)glow.isEnabled=needsGlow;
     }
   };
 }

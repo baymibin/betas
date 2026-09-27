@@ -1,4 +1,7 @@
 // Render on the server clock, not on irregular packet arrival times.
+// Retardo de interpolación: ~3.3 ticks de 33 ms. Con 70 ms (2 ticks) cualquier jitter de red
+// o del temporizador del servidor obligaba a extrapolar y los rivales se congelaban y saltaban.
+export const INTERP_DELAY=110;
 export class RemoteTimeline{
  constructor(){this.frames=[];this.offset=null;this.lastTick=-1;}
  push(tick,players,now){
@@ -9,7 +12,7 @@ export class RemoteTimeline{
  }
  sample(now){
   if(!this.frames.length)return [];
-  const target=now-this.offset-70;let a=this.frames[0],b=a;
+  const target=now-this.offset-INTERP_DELAY;let a=this.frames[0],b=a;
   for(const frame of this.frames){b=frame;if(frame.time>=target)break;a=frame;}
   const t=b.time>a.time?Math.max(0,Math.min(1,(target-a.time)/(b.time-a.time))):1;
   return b.players.map(p=>{

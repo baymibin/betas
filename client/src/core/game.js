@@ -1653,7 +1653,7 @@ function updateOnline(dt) {
   net.boostHeld=boostHeld || elapsed<touchBoostUntil;
   net.throttleHeld=throttleHeld;
   net.axis = (elapsed-lastMouseMoveT)<0.22 ? Math.max(-1,Math.min(1,(-mouseNormX*CFG.lateralLimit-net.player.x)*2)) : (keyState.left?1:0)-(keyState.right?1:0);
-  syncMovement(net.player,dt,net.axis);
+  syncMovement(net.view(dt),dt,net.axis);
   drawRivals(net.timeline.sample(performance.now()),dt);
 }
 // Dibuja a los demás participantes (humanos remotos o bots) con SU equipamiento.
@@ -1669,7 +1669,9 @@ function drawRivals(samples,dt) {
     mesh.setEnabled(true);
     if(r.jumps>(mesh.lastJump||0)||r.ramps>(mesh.lastRamp||0)){mesh.trickAt=elapsed;mesh.trickKind=r.trick;}
     mesh.lastJump=r.jumps;mesh.lastRamp=r.ramps;
-    const prevX=mesh.position.x, z=r.z;
+    // remoteSteer compara desplazamiento lateral con desplazamiento lateral (antes usaba la X del
+    // mundo, que incluye la curva del circuito, y en las curvas el rival se inclinaba a tope).
+    const prevX=mesh.lastX??r.x, z=r.z;mesh.lastX=r.x;
     const remoteAir=r.y;
     oceanSample(curveOffsetAt(z)+r.x,z-waveOriginZ,waveTime,_samp);
     mesh.position.set(curveOffsetAt(z)+r.x, _samp.y*.88+.04+remoteAir,z);
