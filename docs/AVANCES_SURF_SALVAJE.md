@@ -490,6 +490,10 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
   - La ruleta guarda el tick de carrera en que termina (`itemRollEnd` frente a `raceTicks`), no una cuenta atrás que solo bajaba en el servidor. Así el servidor y la predicción del cliente deciden lo mismo con cada E.
   - Antes, al pulsar E justo al final, el cliente paraba la ruleta mientras el servidor ya usaba el poder. La corrección llegaba tarde: el delfín saltaba después, y había tirones.
   - "Mirar atrás" lee el estado real de los botones (`e.buttons`). Antes, si se soltaba el derecho con otro botón pulsado, no llegaba `pointerup` y la cámara se quedaba mirando atrás (girar a los lados parecía trabado).
+- **Controles (segunda corrección):**
+  - **Moverse a los lados:** con izquierda/derecha (o A/D) pulsada manda siempre el teclado. Antes, cualquier `mousemove` daba 0,22 s de control al ratón, que llevaba al surfista hacia la X del puntero (casi siempre el centro). Eso incluye los que el navegador lanza sin mover el ratón. Resultado: se movía un poco, se frenaba y había que pulsar varias veces. Además, un `mousemove` sin cambio de posición ya no cuenta como dirigir con el ratón.
+  - **Sonido del salto:** sonaba dos veces por salto: al pulsar espacio y al ocurrir el salto. Además sonaba en el aire, aunque no se saltara. Ahora suena solo cuando el salto ocurre de verdad. Mantener el espacio no repite nada, y un botón con el foco no se activa con el espacio ni con las flechas durante la carrera.
+  - Probado en Chromium, en práctica y con `mousemove` fantasma cada 100 ms. Antes: con la derecha pulsada, x se quedaba en 0 y cada salto daba 2 sonidos. Ahora: x avanza de forma continua hacia los dos lados, y 2,5 s de espacio mantenido dan 1 salto y 1 sonido.
 - **Salas:**
   - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
   - el código se muestra con una nota explicativa y queda más separado del botón "Crear sala de espera";
@@ -647,6 +651,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Arreglo de moverse a los lados y del sonido del salto
+- El teclado tiene prioridad sobre el ratón al girar: el surfista ya no se frena ni hay que pulsar varias veces. El salto suena una sola vez, cuando ocurre, y mantener el espacio no lo repite.
 
 ### 2026-09-28 · Arreglo de la ruleta de poderes y de "mirar atrás"
 - Ruleta por tick de carrera: el servidor y la predicción coinciden en cada pulsación de E (nueva prueba que lo comprueba alrededor del final de la ruleta). "Mirar atrás" ya no se queda activado.

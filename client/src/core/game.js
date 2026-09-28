@@ -1653,7 +1653,7 @@ function updateOnline(dt) {
   if(!online || !net.player) { for(const mesh of rivals.values()) mesh.setEnabled(false); return; }
   net.boostHeld=boostHeld || elapsed<touchBoostUntil;
   net.throttleHeld=throttleHeld;
-  net.axis = (elapsed-lastMouseMoveT)<0.22 ? Math.max(-1,Math.min(1,(-mouseNormX*CFG.lateralLimit-net.player.x)*2)) : (keyState.left?1:0)-(keyState.right?1:0);
+  net.axis = steerAxis(net.player.x,CFG.lateralLimit);
   syncMovement(net.view(dt),dt,net.axis);
   drawRivals(net.timeline.sample(performance.now()),dt);
 }
@@ -1680,9 +1680,16 @@ function drawRivals(samples,dt) {
   }
   for(const [id,mesh] of rivals) if(!live.has(id)) { mesh.disposeAvatar(); rivals.delete(id); }
 }
-function inputAxis(p) {
-  return (elapsed-lastMouseMoveT)<.22 ? Math.max(-1,Math.min(1,(-mouseNormX*SURF_LIMIT-p.x)*2)) : (keyState.left?1:0)-(keyState.right?1:0);
+// Teclado primero: con izquierda/derecha pulsada manda el teclado. Antes cualquier mousemove
+// (también los que el navegador genera solo, sin mover el ratón) daba 0,22 s de control al
+// ratón, que tiraba del surfista hacia la X del puntero (casi siempre el centro): se movía un
+// poco y se frenaba, y había que pulsar varias veces.
+function steerAxis(x,limit) {
+  const keys=(keyState.left?1:0)-(keyState.right?1:0);
+  if(keyState.left||keyState.right||(elapsed-lastMouseMoveT)>=.22)return keys;
+  return Math.max(-1,Math.min(1,(-mouseNormX*limit-x)*2));
 }
+function inputAxis(p) { return steerAxis(p.x,SURF_LIMIT); }
 function syncMovement(p,dt,axis) {
   raceUI.update(p);raceUI.ranking(online?(net.players||[]):practiceField(),online?net.id:p.id);
   if(p.ramps>lastRamp){playSound('ramp');lastRamp=p.ramps;trickStart=elapsed;trickType=p.trick;showTrick('RAMPA - '+TRICKS[trickType]);}
@@ -1737,9 +1744,12 @@ const syncLookBack=e=>{const held=running&&(e.buttons&2)!==0;if(held&&e.type==='
 for(const type of ['pointerdown','pointermove','pointerup'])window.addEventListener(type,syncLookBack,true);
 window.addEventListener('pointercancel',()=>setLookBack(false),true);
 window.addEventListener('contextmenu',e=>{if(running)e.preventDefault();});
-window.addEventListener('blur',()=>{ keyState.left=false; keyState.right=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
+window.addEventListener('blur',()=>{ keyState.left=false; keyState.right=false; spaceHeld=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
 
-function doJump(){ if(!running||isPaused)return;if(online)net.buttons|=1;else localButtons|=1; playSound('jump'); }
+// El sonido del salto lo pone syncMovement cuando el salto ocurre de verdad (p.jumps sube):
+// antes sonaba también aquí, dos veces por salto, y en el aire aunque no se saltara.
+function doJump(){ if(!running||isPaused)return;if(online)net.buttons|=1;else localButtons|=1; }
+let spaceHeld=false;
 function tryBoost(){ if(!running||isPaused)return;touchBoostUntil=elapsed+1.4;if(online)net.buttons|=2;else localButtons|=2; }
 
 // =====================================================================
@@ -1756,16 +1766,19 @@ window.addEventListener('keydown', function(e){
   }
   if(!running || isPaused) return;
   switch(e.key){
-    case 'ArrowLeft': case 'a': case 'A': keyState.left = true; break;
-    case 'ArrowRight': case 'd': case 'D': keyState.right = true; break;
-    case ' ': if(!e.repeat)doJump(); e.preventDefault(); break;
+    case 'ArrowLeft': case 'a': case 'A': keyState.left = true; e.preventDefault(); break;
+    case 'ArrowRight': case 'd': case 'D': keyState.right = true; e.preventDefault(); break;
+    case ' ': if(!e.repeat&&!spaceHeld)doJump(); spaceHeld=true; e.preventDefault(); break;
     case 'e': case 'E': if(!e.repeat){if(online)net.buttons|=4;else localButtons|=4;}e.preventDefault();break;
     case 'Shift': case 'ShiftLeft': case 'ShiftRight': boostHeld=true; e.preventDefault(); break;
     case 'ArrowUp': case 'w': case 'W': throttleHeld=true; e.preventDefault(); break;
   }
 }, { passive: false });
 window.addEventListener('keyup', function(e){
+  // Un botón con el foco se activa con el keyup del espacio: durante la carrera no debe pasar.
+  if(running&&(e.key===' '||e.key.startsWith('Arrow')))e.preventDefault();
   switch(e.key){
+    case ' ': spaceHeld=false; break;
     case 'Shift': case 'ShiftLeft': case 'ShiftRight': boostHeld=false; net.boostHeld=false; break;
     case 'ArrowUp': case 'w': case 'W': throttleHeld=false; if(net)net.throttleHeld=false; break;
     case 'ArrowLeft': case 'a': case 'A': keyState.left = false; break;
@@ -1773,7 +1786,12 @@ window.addEventListener('keyup', function(e){
   }
 });
 
+// Solo cuenta como dirigir con el ratón si el puntero se ha movido de verdad (el navegador
+// lanza mousemove sin movimiento cuando cambia lo que hay debajo del cursor).
+let lastMouseX=null;
 window.addEventListener('mousemove', function(e){
+  if(e.clientX===lastMouseX)return;
+  lastMouseX=e.clientX;
   mouseNormX = (e.clientX / window.innerWidth) * 2 - 1;
   lastMouseMoveT = elapsed;
 });
