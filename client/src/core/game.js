@@ -1693,7 +1693,7 @@ function inputAxis(p) { return steerAxis(p.x,SURF_LIMIT); }
 // Diagnóstico de controles: abre el juego con ?debug para ver en pantalla qué recibe el
 // navegador (teclas, de dónde sale el giro, posición y límite). Sirve para comparar lo que
 // pasa en el equipo del jugador con lo que debería pasar.
-const CLIENT_BUILD='controles-4';
+const CLIENT_BUILD='controles-5';
 const inputDebug=PARAMS.has('debug')?Object.assign(document.createElement('pre'),{id:'input-debug'}):null;
 const inputStats={down:0,repeat:0,up:0,blur:0,last:''};
 if(inputDebug){inputDebug.style.cssText='position:fixed;right:8px;top:200px;z-index:99;margin:0;padding:6px 8px;background:rgba(0,0,0,.72);color:#9ff;font:12px/1.35 monospace;pointer-events:none;white-space:pre';document.body.appendChild(inputDebug);}
@@ -1705,7 +1705,7 @@ function showInputDebug(p,axis,limit){
     `teclas  izq ${keyState.left?'SÍ':'no'}  der ${keyState.right?'SÍ':'no'}\n`+
     `giro    ${axis.toFixed(2)} (${mouse?'RATÓN':'teclado'})\n`+
     `x       ${p.x.toFixed(2)} / límite ±${limit.toFixed(1)}\n`+
-    `eventos down ${inputStats.down} rep ${inputStats.repeat} up ${inputStats.up} blur ${inputStats.blur}\n`+
+    `eventos down ${inputStats.down} rep ${inputStats.repeat} up ${inputStats.up} blur ${inputStats.blur} focus ${inputStats.focus||0} · foco ${document.hasFocus()?'SÍ':'NO'}\n`+
     `último  ${inputStats.last}`;
 }
 function syncMovement(p,dt,axis) {
@@ -1767,9 +1767,24 @@ window.addEventListener('contextmenu',e=>{if(running)e.preventDefault();});
 // "Teclas filtro", que salta al pulsar Mayús 5 veces o mantenerla 8 s, o un overlay), el
 // navegador deja de mandar las teclas al juego y el surfista se para aunque A/D sigan pulsadas.
 // Se avisa en pantalla para que el jugador sepa que debe volver a hacer clic en el juego.
-window.addEventListener('focus',()=>document.body.classList.remove('game-unfocused'));
+// El navegador puede mandar 'blur' sin que el jugador cambie de ventana, o perder el foco
+// solo un instante (un aviso que aparece y se va). Antes cada 'blur' soltaba A/D al momento
+// y el surfista se paraba aunque la tecla siguiera pulsada. Ahora solo se sueltan las teclas si
+// el foco sigue fuera 400 ms después; si vuelve antes, el control sigue como estaba.
+let blurTimer=0;
+function releaseAllInput(){keyState.left=false;keyState.right=false;spaceHeld=false;boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0;}
+window.addEventListener('focus',()=>{clearTimeout(blurTimer);inputStats.focus=(inputStats.focus||0)+1;document.body.classList.remove('game-unfocused');});
 window.addEventListener('pointerdown',()=>document.body.classList.remove('game-unfocused'),true);
-window.addEventListener('blur',()=>{ inputStats.blur++;inputStats.last='blur tras '+(inputStats.key||'-')+' (la ventana perdió el foco)'; if(running)document.body.classList.add('game-unfocused'); keyState.left=false; keyState.right=false; spaceHeld=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
+window.addEventListener('blur',()=>{
+  inputStats.blur++;inputStats.last='blur tras '+(inputStats.key||'-');
+  clearTimeout(blurTimer);
+  blurTimer=setTimeout(()=>{
+    if(document.hasFocus()){inputStats.last+=' (falso: el juego seguía con el foco)';return;}
+    inputStats.last+=' (la ventana perdió el foco)';
+    if(running)document.body.classList.add('game-unfocused');
+    releaseAllInput();
+  },400);
+});
 
 // El sonido del salto lo pone syncMovement cuando el salto ocurre de verdad (p.jumps sube):
 // antes sonaba también aquí, dos veces por salto, y en el aire aunque no se saltara.
