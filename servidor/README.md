@@ -30,9 +30,11 @@ La simulación y el protocolo compartidos viven en `client/src/shared` y se impo
 
 ## Comprobaciones
 
-Con el servidor iniciado, en otra terminal ubicada en `servidor`:
+Con el servidor iniciado con todos los cosméticos gratis (las pruebas en vivo conectan invitados con alas y tablas variadas, y un invitado solo puede lucir lo gratuito), en otra terminal ubicada en `servidor`:
 
 ```powershell
+# terminal 1 (PowerShell): $env:ECONOMY_CONFIG="test/fixtures/economy-free.json"; npm start
+# terminal 1 (Linux/macOS): ECONOMY_CONFIG=test/fixtures/economy-free.json npm start
 npm test
 node scripts/verify-layout.mjs
 node scripts/verify-race-live.mjs
@@ -46,5 +48,6 @@ Las herramientas antiguas de migración permanecen en `backups/migrations` como 
 
 Login con Google y Discord, monedas (Tablas Normales y Tablas de Oro), inventario y tienda con precios.
 Configuración: copia `.env.example` a `.env` y rellena las credenciales (ver `docs/AVANCES_SURF_SALVAJE.md`, secciones 8 y 9).
-Precios y recompensas: `config/economy.json`. Ajustes de saldo autorizados: `npm run admin -- users | grant | history`.
+Precios, rareza, recompensas y reglas del Trade: `config/economy.json`. Consola de administración: `npm run admin -- users | grant | history | give-item | trades | trade-revert`.
+Trade: intercambio de items por items (sin monedas) entre cuentas registradas, con el código de surfista de cada cuenta (ver `docs/AVANCES_SURF_SALVAJE.md`, sección "Trade").
 Base de datos: MySQL/MariaDB con `DATABASE_URL=mysql://usuario:contraseña@localhost:3306/base` en `.env` (p. ej. la de aaPanel), o SQLite por defecto en `servidor/data/` (no se sube a git). En ambos casos las tablas se crean solas al arrancar. Requiere Node.js 22.13 o superior.

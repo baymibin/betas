@@ -1,0 +1,8 @@
+{
+  "_comment": "Solo pruebas: todos los cosméticos gratis. Las pruebas en vivo (scripts/test-*-live.mjs) conectan invitados con alas y tablas variadas, y un invitado solo puede lucir lo gratuito. Arranca el servidor con ECONOMY_CONFIG=test/fixtures/economy-free.json antes de npm test.",
+  "itemPrices": {},
+  "rewards": {"enabled": true, "finish": 20, "placeBonus": [30, 20, 10], "minHumans": 2, "dailyCap": 300},
+  "trade": {"enabled": true, "minAccountAgeHours": 0},
+  "exchangePackages": [],
+  "goldProducts": []
+}

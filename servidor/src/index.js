@@ -14,6 +14,7 @@ import {createInputQueue, pushInput, nextInput, resetInputs} from './input-queue
 import {statSync, existsSync} from 'node:fs';
 import {openDatabase, syncCatalog, loadEconomyConfig, describeDatabase} from './db.js';
 import {createEconomy} from './economy.js';
+import {createTrade} from './trade.js';
 import {authConfig, createAuth, SESSION_COOKIE} from './auth.js';
 import {mountApi, parseCookies} from './api.js';
 
@@ -30,6 +31,7 @@ catch (error) { console.error('[db] No se pudo abrir la base de datos (' + descr
 await syncCatalog(db, economyConfig);
 const economy = createEconomy(db, economyConfig);
 await economy.loadCache();
+const trade = createTrade(db, economy, economyConfig);
 const authSettings = authConfig();
 const auth = createAuth(db, economy, authSettings);
 const socketsByUser = new Map();   // surf_user_id -> conexiones /play abiertas
@@ -230,7 +232,7 @@ setInterval(() => {
 }, 4);
 let lastSnapshot = 0;
 const SNAPSHOT_BACKLOG = 4096;
-mountApi(app, {auth, economy, config: authSettings, onEquipmentChanged: refreshEquipment});
+mountApi(app, {auth, economy, trade, config: authSettings, onEquipmentChanged: refreshEquipment});
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));

@@ -5,7 +5,7 @@
 
 Leyenda de estados: **IMPLEMENTADO** (código hecho) · **PROBADO** (verificado con pruebas automáticas o en navegador) · **PENDIENTE** (falta hacerlo) · **BLOQUEADO POR CONFIGURACIÓN EXTERNA** (el código está listo; falta algo que solo puede hacer el dueño del proyecto, como crear credenciales).
 
-Última actualización: **2026-09-27**
+Última actualización: **2026-09-28**
 
 ---
 
@@ -89,6 +89,8 @@ docs/AVANCES_SURF_SALVAJE.md este documento
 | `GET /api/coins/packages` · `POST /api/coins/exchange` | Paquetes Oro→Normales y cambio | exchange: sí | sí |
 | `GET /api/payments/products` · `POST /api/payments/checkout` | Productos de oro / pago (deshabilitado: 503) | — / sí | sí |
 | `POST /api/payments/webhook/:provider` | Reservado para el proveedor de pagos (501) | — | firma (pendiente) |
+| `GET /api/trade/summary` · `/inventory` · `/user?code=` · `/offers?box=received\|sent\|history` · `/blocked` | Trade: código propio y ofertas pendientes, items intercambiables, buscar surfista, listados, bloqueados | sí | — |
+| `POST /api/trade/offers` · `/accept` · `/decline` · `/cancel` · `/block` · `/unblock` | Trade: crear (o contraofertar), aceptar, rechazar, cancelar, bloquear | sí | sí |
 
 ## 6. Base de datos
 
@@ -141,6 +143,7 @@ Todas las cantidades son **INTEGER**; nunca coma flotante.
 - Una carpeta por motor: `servidor/migrations/mysql/NNN_nombre.sql` y `servidor/migrations/sqlite/NNN_nombre.sql`, con el **mismo nombre** y el mismo modelo. Se aplican en orden por `db.js` y se anotan en `schema_migrations`. Nunca se reaplican.
 - **Regla:** no editar una migración ya aplicada. Para cambiar el esquema se crea `002_...sql` **en las dos carpetas**. Prohibido `DROP TABLE` sobre datos reales.
 - En MySQL el DDL no es transaccional: las migraciones usan `CREATE TABLE IF NOT EXISTS` para poder relanzarse si algo se corta.
+- `002_trade.sql` (Trade): crea `user_inventory_v2` e `item_purchases_v2` **copiando** los datos de `user_inventory` e `item_purchases`, que quedan como histórico (no se borran ni se modifican). Hacía falta porque la tabla anterior no admitía el origen `TRADE` (su `CHECK` no se puede cambiar en SQLite sin reconstruirla) y `item_purchases` impedía volver a comprar un item entregado en un trade (`UNIQUE (user_id, item_id)`). Añade `trade_profiles` (código de surfista), `trade_offers`, `trade_offer_items`, `item_transfers` (libro de movimientos de items) y `trade_blocks`. Sin `ALTER TABLE`: se puede relanzar en MySQL.
 - El catálogo (`shop_items`), los paquetes y los productos se **sincronizan** en cada arranque desde `config/economy.json` y el catálogo compartido. Lo que desaparece se marca como no disponible; no se borra.
 
 ## 8. Login Google
@@ -222,14 +225,24 @@ npm run admin -- history <userId>
 
 ## 15. Inventario
 
-**IMPLEMENTADO · PROBADO.** `user_inventory` guarda lo comprado (o regalado por un admin). Los artículos gratuitos no hace falta poseerlos: todos pueden usarlos. No se regala el catálogo a las cuentas nuevas. El inventario se ve en Perfil y se recupera en cualquier PC.
+**IMPLEMENTADO · PROBADO.** `user_inventory_v2` (desde la migración 002) guarda lo comprado, lo entregado por un admin (`npm run admin -- give-item`) y lo recibido en un trade (origen `TRADE`). Los artículos gratuitos no hace falta poseerlos: todos pueden usarlos. No se regala el catálogo a las cuentas nuevas. El inventario se ve en Perfil y se recupera en cualquier PC.
 
 ## 16. Catálogo
 
 **IMPLEMENTADO · PROBADO.**
 - Fuente única: `client/src/shared/catalog.js` (nombres, descripciones, wings) + `board-cosmetics.js` (tablas). Lo usan la tienda, las salas y el servidor.
 - IDs estables `categoria:indice` (`character:0..4`, `board:0..5`, `wing:0..8`, `hat:0`). **El índice es el que usa Babylon.js y el protocolo: no reordenar ni borrar**, solo añadir al final.
-- Precios en `config/economy.json → itemPrices` (Tablas Normales). **Hoy todo el catálogo sigue gratis (precio 0)**, como antes. Para poner a la venta un artículo: `"itemPrices": {"wing:8": 900}` y reiniciar.
+- Precios en `config/economy.json → itemPrices` (Tablas Normales). **Desde el 2026-09-28 solo son gratis Classic (`character:0`), Ola Tropical (`board:0`), Angel Wings (`wing:0`) y Sin hat (`hat:0`).** El resto tiene precio:
+
+| Rareza | Items | Precio |
+|---|---|---|
+| Común | Mint, Sunny, Lilac, Coral (`character:1..4`) | 300 |
+| Raro | Gótica, Dragón, Anime (`board:1..3`) · Aqua, Fire, Crystal, Nature Wings (`wing:1..4`) | 600 |
+| Épico | Cine, Bloques (`board:4..5`) · Bat Demon, Crimson Butterfly Wings (`wing:5..6`) | 1000 |
+| Legendario | Dark Demon, Mechanical Demon Wings (`wing:7..8`) | 1500 |
+
+- Rareza en `itemRarity` (common, rare, epic, legendary; solo presentación): se ve en La tiendita y en el Trade.
+- Consecuencia: quien llevaba un item que ahora es de pago sin haberlo comprado vuelve al gratuito de esa ranura (el servidor nunca regala items de pago). Los invitados solo pueden lucir los gratuitos.
 
 ## 17. Compras
 
@@ -237,6 +250,8 @@ npm run admin -- history <userId>
 1. Sesión + CSRF.
 2. En una transacción atómica: repetición del mismo `requestId` → devuelve el mismo resultado sin cobrar; artículo existente y disponible; precio leído de la base de datos (se ignora cualquier precio que envíe el cliente); no gratuito; no poseído.
 3. Descuenta Tablas Normales (falla con `insufficient_funds` sin tocar nada), entrega el artículo y registra la compra y el movimiento.
+
+Un item entregado en un trade se puede volver a comprar (la propiedad la decide el inventario; `item_purchases_v2` solo registra la compra por `requestId`).
 
 Estados en la tienda: **COMPRAR · EQUIPAR · EQUIPADO · SALDO INSUFICIENTE** (lleva a Conseguir monedas) · **INICIA SESIÓN** (invitado ante un artículo de pago).
 
@@ -347,6 +362,58 @@ Pruebas (Playwright, 12 comprobaciones OK):
 
 Problemas encontrados: el porcentaje "100 %" se partía en dos líneas (columna ampliada y `nowrap`), y las decoraciones hechas con pseudo-elementos que salían del borde generaban scroll interno (pasaron a ser capas de fondo).
 
+## Trade (2026-09-28)
+
+**IMPLEMENTADO · PROBADO (servidor en SQLite y MariaDB; navegador Chromium a 1366×768, 1672×941 y 390×844).**
+
+Intercambio de **items por items, sin monedas**, solo entre **cuentas registradas**. El servidor decide todo: qué tiene cada uno, si la oferta vale y el intercambio en sí.
+
+**Reglas (servidor, `servidor/src/trade.js`):**
+- Solo se ofrecen items **poseídos** y **no gratuitos** (los gratuitos los tiene todo el mundo). `trade.untradeable` en `economy.json` puede excluir ids concretos.
+- De 1 a `maxItemsPerSide` (4) items por lado. Quien recibe un item no puede tenerlo ya. No se puede hacer un trade con uno mismo.
+- Cada cuenta tiene un **código de surfista** (`SURF-XXXXX`, 5 caracteres sin 0/O/1/I). Se ve en el Perfil y en la cabecera del Trade, y se escribe con o sin guion, en mayúsculas o minúsculas. Los nicks se repiten, por eso no se busca por nick.
+- Las ofertas son **inmutables**: cambiar algo es una **contraoferta** (`parentId`), y la original pasa a `COUNTERED`.
+- Aceptar exige el `contentHash` de lo que se vio, así nadie puede cambiar la oferta en el último momento. Sucede en **una sola transacción**:
+  1. Se bloquean los monederos de las dos cuentas, siempre en el mismo orden, así no hay interbloqueos en MySQL.
+  2. Se vuelve a comprobar todo: estado, caducidad, límite diario, propiedad y que nadie reciba algo que ya tiene.
+  3. Se mueven los items (origen `TRADE`). Lo entregado que estuviera equipado vuelve al gratuito.
+  4. Cada movimiento queda en `item_transfers`.
+  5. Las demás ofertas abiertas con esos items pasan a `INVALID`.
+
+  Repetir la petición no repite el trade.
+- **Estados:** `OPEN`, `COMPLETED`, `DECLINED`, `CANCELED`, `EXPIRED` (a las `offerTTLHours` = 72 h), `INVALID`, `COUNTERED` y `REVERTED`.
+- **Anti-abuso:**
+  - antigüedad mínima de la cuenta (`minAccountAgeHours` = 24; pon 0 para probar en local con cuentas recién creadas);
+  - `dailyTradeLimit` (20) trades por cuenta y día;
+  - `maxOpenOffers` (10) ofertas abiertas;
+  - no se repite la misma oferta abierta;
+  - límite de peticiones del grupo `write`.
+- **Bloqueos:** quien bloquea deja de recibir ofertas de esa cuenta y se cancelan las pendientes entre las dos. Se desbloquea desde el Historial.
+- **Administración** (solo consola):
+  - `npm run admin -- give-item <userId> <itemId> "<motivo>"`: entrega un item, útil para eventos o para probar;
+  - `trades <userId>`: lista los trades de una cuenta;
+  - `trade-revert <tradeId>`: deshace un trade si los items siguen en manos de quien los recibió; queda como `REVERT` en `item_transfers`.
+
+**Interfaz (`client/src/account/trade-ui.js`, `client/styles/trade.css`), según el boceto:**
+- Botón **Trade** en el menú con el icono entregado (`assets/images/menu/menu-trade.webp`, recortado a 256 px) y un globo con las ofertas recibidas pendientes.
+- **Sin sesión:** el modal solo muestra "Solo para surfistas registrados" con Continuar con Google / Discord.
+- **Cabecera:**
+  - kicker "🌴 SURF CLUB · TRADE";
+  - título "Trade" con el icono;
+  - tu código de surfista, que se copia con un clic;
+  - pestañas **Mis items**, **Ofertas recibidas** (con contador), **Ofertas enviadas** e **Historial**.
+- **Mis items (nuevo trade), en tres columnas:**
+  1. **Items:** interruptor Tus items / Items de <nick>, filtros Todos, Personajes, Tablas, Wings y Hats, y tarjetas con rareza, "EN USO" y "YA LO TIENES".
+  2. **Nuevo trade:** buscar por código, surfista elegido, columnas Ofreces y Recibes con "Agregar item", botón **Enviar oferta** y confirmación.
+  3. **Vista del item:** en 3D (la misma escena de La tiendita, con el item puesto sobre tu surfer), nombre, rareza, tipo, descripción y el **Resumen del trade**.
+- **Ofertas:**
+  - **recibidas:** Aceptar (con confirmación que avisa de lo que entregas), Contraofertar (abre el constructor con la oferta), Rechazar y Bloquear;
+  - **enviadas:** Cancelar;
+  - **historial:** estado y fecha, más la lista de surfistas bloqueados.
+- Responsive: dos columnas por debajo de 1060 px y una sola en móvil, sin scroll horizontal.
+- Hats: la pestaña existe, pero hoy solo hay "Sin hat" (gratuito), así que aparece vacía con "Los hats llegarán pronto".
+- Para las pruebas en vivo de red, `test/fixtures/economy-free.json` deja todos los cosméticos gratis. Solo es una fixture de pruebas y el servidor real no la usa.
+
 ## 21. Archivos modificados (esta fase)
 
 - `client/index.html`: logo SVG, panel de acceso, botones de Google y Discord, datos con iconos, perfil y tienda (monedero, pestaña Conseguir monedas).
@@ -411,6 +478,33 @@ Problemas encontrados: el porcentaje "100 %" se partía en dos líneas (columna 
 - `npm test` (servidor en marcha, SQLite): **60/60**. Incluye:
   - `test/economy.test.js` (7): saldos independientes, compra atómica, rechazo por saldo, doble compra, idempotencia, saldo nunca negativo (también por `CHECK`), oro que no compra artículos, conversión atómica, recompensas con tope, oro solo desde orden PAID y migración local sin regalos.
   - `test/auth-flow.test.js` (3): servidor real + **proveedor OAuth simulado** (RSA/JWKS/PKCE para Google, token/@me para Discord). Cubre cuenta nueva, cuenta existente, vinculación, login desde otro navegador a la misma cuenta, robo de identidad bloqueado, desvincular, logout, state reutilizado, otro navegador, `aud`/`nonce` falsos, CSRF/Origin, compra/conversión idempotentes, ajuste admin por CLI, pagos deshabilitados, webhook sin efecto y equipo autoritativo por WebSocket (cuenta e invitado).
+- **Trade (2026-09-28):**
+  - `test/trade.test.js`: 11 pruebas × 2 motores = **22/22** (SQLite y MariaDB 10.11). Cubren:
+    - códigos de surfista;
+    - un trade completo, con desequipado, libro de movimientos, repetición sin efecto y recompra;
+    - todas las validaciones de creación;
+    - solo acepta el destinatario y con la huella exacta;
+    - **5 aceptaciones simultáneas → 1 trade**;
+    - el mismo item en dos ofertas aceptadas a la vez: solo una se completa y el item existe una sola vez;
+    - contraofertas, caducidad, bloqueos, antigüedad mínima y reversión del admin.
+  - `npm test` completo (servidor con `test/fixtures/economy-free.json`): **71/71**.
+  - Navegador, dos cuentas de prueba: **32 comprobaciones**. Cubren:
+    - invitado sin acceso ni globo;
+    - globo con las ofertas reales;
+    - código propio;
+    - solo los items intercambiables;
+    - códigos mal escritos, propio o en minúsculas;
+    - items del otro;
+    - vista 3D con rareza y resumen;
+    - confirmación antes de enviar;
+    - oferta en Enviadas;
+    - aceptar una oferta, con el inventario real cambiado en el servidor;
+    - contraoferta;
+    - historial;
+    - rechazar, bloquear y desbloquear;
+    - código visible en el Perfil.
+
+    No hay errores de consola, salvo los 400 esperados de los códigos inválidos que la propia prueba escribe.
 - `scripts/test-cosmetics-sync-live.mjs`: OK con 3 clientes.
 - **Navegador (Chromium, Playwright):**
   - Menú como en la referencia, con y sin sesión.
@@ -430,6 +524,8 @@ Problemas encontrados: el porcentaje "100 %" se partía en dos líneas (columna 
 - Recuperar el equipo de la cuenta en el modo solitario (hoy usa el mismo perfil en memoria; funciona, pero sin validación del servidor porque la práctica es local).
 - Prueba en vivo de la recompensa al terminar una carrera online entera (la lógica está probada a nivel de unidad).
 - Cabeceras CSP y despliegue con HTTPS.
+- Trade: tablón de **Trades públicos** ("tengo X, busco Y") y lista de **jugadores recientes** para elegir destinatario (segunda entrega).
+- Trade: aviso en tiempo real de ofertas nuevas (hoy el globo se actualiza al abrir el menú o el Trade).
 
 ## 27. Configuración externa pendiente
 
@@ -440,7 +536,8 @@ Problemas encontrados: el porcentaje "100 %" se partía en dos líneas (columna 
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` y redirect | Discord Developer Portal | BLOQUEADO (dueño) |
 | `PUBLIC_URL` con dominio https + `SESSION_SECRET` + `NODE_ENV=production` | Servidor de producción | BLOQUEADO (dueño) |
 | Proveedor de pagos, credenciales y webhook | Proveedor elegido | BLOQUEADO (dueño) |
-| Precios de paquetes y artículos | `servidor/config/economy.json` | PENDIENTE (decisión de negocio) |
+| Precios de artículos | `servidor/config/economy.json` | IMPLEMENTADO (2026-09-28, sección 16) |
+| Precios de paquetes Oro → Normales | `servidor/config/economy.json` | PENDIENTE (decisión de negocio) |
 
 Checklist de prueba con credenciales reales (para cada proveedor):
 - [ ] Botón visible y abre la autenticación real.
@@ -461,6 +558,11 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Sistema de Trade
+- Intercambio de items por items (sin monedas) solo para cuentas registradas, con código de surfista, ofertas, contraofertas, caducidad, bloqueos, historial y administración por consola (sección "Trade").
+- Todos los items tienen precio salvo Classic, Ola Tropical, Angel Wings y Sin hat, con rareza en la tienda y el Trade (sección 16).
+- Migración 002 (SQLite y MySQL), probada en MariaDB y SQLite. Botón Trade en el menú con el icono entregado, y código de surfista en el Perfil.
 
 ### 2026-09-28 · Remasterización del modal Ajustes
 - Panel horizontal con tarjetas, iconos SVG, sliders turquesa → amarillo con thumb dorado y porcentaje real; misma lógica y persistencia. Título del Perfil con emoji 🌊.

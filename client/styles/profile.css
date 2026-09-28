@@ -35,7 +35,9 @@
 .profile-nick-save{flex:none;min-width:120px;height:52px;padding:0 16px;border-radius:12px;border:1px solid #fff0b0;background:linear-gradient(180deg,#ffe07a,#ffc23d);color:#13262d;
   font:800 16px/1.05 'Baloo 2',sans-serif;cursor:pointer;box-shadow:0 0 16px #ffc83c66,inset 0 2px 0 #fffbe0}
 .profile-nick-save:disabled{opacity:.6;cursor:default}
-.profile-id{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--pf-text2);word-break:break-all}
+.profile-id{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:12px;color:var(--pf-text2);word-break:break-all}
+.profile-id > span{display:inline-flex;align-items:center;gap:6px}
+.profile-code{font-size:13px;color:#e9fbff}.profile-code b{color:#ffd46b;letter-spacing:.6px}
 .profile-id button{flex:none;background:none;border:0;padding:2px;color:#cdefff;cursor:pointer}
 .profile-id svg{width:15px;height:15px;fill:currentColor;display:block}
 .profile-nick-status{font-size:12px;color:#aef4df;min-height:0}
