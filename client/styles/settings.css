@@ -1,0 +1,87 @@
+/* Surf Salvaje · Ajustes. Solo presentación: los controles, ids y eventos son los de siempre
+   (home-ui.js lee y guarda los valores; --fill pinta el tramo activo de cada slider).
+   Mismos tokens que La tiendita y el Perfil: cristal azul petróleo, borde turquesa, dorado. */
+.settings-dialog{--st-cyan:#57e3ee;--st-gold:#ffd46b;--st-text2:#b8d4df;--st-line:#8feaf055;
+  width:min(90vw,950px);max-width:none;max-height:94dvh;padding:0;border:1px solid #b8f3ff78;border-radius:26px;overflow:hidden;
+  background:#082e3b;color:#f6ffff;font-family:'Baloo 2',sans-serif;box-shadow:0 26px 90px #00131dbb,inset 0 0 0 1px #ffffff25}
+.settings-dialog::backdrop{background:linear-gradient(#001d2c73,#001725a6),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;backdrop-filter:blur(7px) saturate(.9)}
+.settings-shell{position:relative;max-height:94dvh;overflow:auto;box-sizing:border-box;padding:26px 30px 18px;display:flex;flex-direction:column;gap:12px;
+  /* Hibisco (arriba) y hojas (abajo a la izquierda) como capas del fondo: muy tenues y sin desbordar. */
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%2357e3ee' fill-opacity='.08'%3E%3Cellipse cx='50' cy='24' rx='14' ry='22'/%3E%3Cellipse cx='50' cy='24' rx='14' ry='22' transform='rotate(72 50 50)'/%3E%3Cellipse cx='50' cy='24' rx='14' ry='22' transform='rotate(144 50 50)'/%3E%3Cellipse cx='50' cy='24' rx='14' ry='22' transform='rotate(216 50 50)'/%3E%3Cellipse cx='50' cy='24' rx='14' ry='22' transform='rotate(288 50 50)'/%3E%3C/g%3E%3C/svg%3E") right 96px top -34px/190px no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%2357e3ee' fill-opacity='.06'%3E%3Cpath d='M10 95C20 55 45 25 92 8 70 40 48 70 10 95Z'/%3E%3Cpath d='M4 70C12 45 30 30 60 22 44 42 28 58 4 70Z'/%3E%3C/g%3E%3C/svg%3E") left -20px bottom -24px/170px no-repeat,
+    linear-gradient(115deg,#062c40f0 0%,#063a4ce6 55%,#074253d0 100%),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;scrollbar-width:thin;scrollbar-color:#57e3ee55 transparent}
+.settings-dialog .profile-close{top:18px;right:20px}
+.settings-kicker{font-size:12px;font-weight:900;letter-spacing:5px;color:var(--st-cyan);margin:2px 0 0 4px}
+.settings-title{display:flex;align-items:center;gap:12px;margin:-4px 0 4px 2px;font-size:clamp(32px,3.6vw,46px);font-weight:800;line-height:1.1;letter-spacing:-.5px;text-shadow:0 3px 12px #001b24bb}
+.settings-title span{font-size:.8em;filter:drop-shadow(0 2px 6px #0008)}
+
+.settings-card{display:block;box-sizing:border-box;border-radius:18px;border:1px solid var(--st-line);background:linear-gradient(160deg,#05344acc,#03263ad9);box-shadow:inset 0 0 22px #57e3ee0d,0 8px 22px #00121c40}
+.settings-toggle{display:flex;align-items:center;gap:18px;padding:10px 20px 10px 12px;cursor:pointer;transition:border-color .15s,background .15s}
+.settings-toggle:hover{border-color:#8feaf088}
+.settings-label{flex:1;font-size:18px;font-weight:700;color:#fff}
+
+/* Iconos: cuadrado redondeado con borde turquesa (dorado en Sonido). */
+.settings-icon{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:13px;border:1.5px solid #57e3ee66;background:#04283acc;box-shadow:inset 0 0 10px #57e3ee18}
+.settings-icon svg{width:26px;height:26px;fill:none;stroke:#dff8ff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.settings-icon svg .fill{fill:#dff8ff;stroke:none}
+.settings-icon svg .fill.gold{fill:#ffd46b}
+.settings-icon.gold{border-color:#ffd46bcc;box-shadow:0 0 14px #ffc83c55,inset 0 0 10px #ffd46b22}
+.settings-icon.gold svg{stroke:#ffd46b}
+.settings-icon.gold svg .fill{fill:#ffd46b}
+
+/* Casilla: cuadrado turquesa con marca blanca. */
+.settings-check{flex:none;appearance:none;-webkit-appearance:none;width:26px;height:26px;margin:0;border-radius:6px;border:2px solid #7ff5ee;background:#022030;cursor:pointer;display:grid;place-items:center;transition:background .15s,box-shadow .15s}
+.settings-check:checked{background:#2fd6c4 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/80% no-repeat;border-color:#9ffcf4;box-shadow:0 0 12px #2fd6c466}
+.settings-check:focus-visible{outline:3px solid #ffd46b;outline-offset:3px}
+
+/* ---------- Ajustes de audio ---------- */
+#settings-dialog .audio-settings{margin:0;padding:14px 22px 8px}
+#settings-dialog .audio-settings h3{margin:0 0 4px;font-size:12px;font-weight:900;letter-spacing:4px;color:var(--st-cyan)}
+#settings-dialog .volume-row{display:grid;grid-template-columns:48px minmax(120px,190px) minmax(0,1fr) 78px;align-items:center;gap:0 18px;padding:7px 0;border-bottom:1px solid #57e3ee24}
+#settings-dialog .volume-row:last-child{border-bottom:0}
+#settings-dialog .volume-row label{font-size:16px;font-weight:700;color:#f2fcff}
+#settings-dialog .volume-row output{font-size:18px;font-weight:800;color:var(--st-gold);text-align:right;min-width:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+#settings-dialog .volume-row.is-muted output{color:#8fb4bd}
+#settings-dialog .volume-row.is-muted .volume-slider{opacity:.55}
+
+/* Slider: pista azul petróleo, tramo activo turquesa -> aqua -> amarillo, thumb dorado con brillo. */
+#settings-dialog .volume-slider{grid-column:auto;width:100%;height:30px;margin:0;background:none;-webkit-appearance:none;appearance:none;cursor:pointer}
+#settings-dialog .volume-slider::-webkit-slider-runnable-track{height:10px;border-radius:999px;border:1px solid #57e3ee40;
+  background:linear-gradient(90deg,#1fc6e0,#5ce8f0 55%,#bff0a0 80%,#ffd46b) 0/var(--fill) 100% no-repeat,#02192a}
+#settings-dialog .volume-slider::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-9px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff3b8,#ffd046 45%,#f0a716);border:2px solid #fff6d8;box-shadow:0 0 14px #ffc83ccc,0 2px 6px #0007}
+#settings-dialog .volume-slider::-moz-range-track{height:10px;border-radius:999px;border:1px solid #57e3ee40;background:#02192a}
+#settings-dialog .volume-slider::-moz-range-progress{height:10px;border-radius:999px;background:linear-gradient(90deg,#1fc6e0,#5ce8f0 55%,#bff0a0 80%,#ffd46b)}
+#settings-dialog .volume-slider::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3b8,#ffd046 45%,#f0a716);border:2px solid #fff6d8;box-shadow:0 0 14px #ffc83ccc,0 2px 6px #0007}
+#settings-dialog .volume-slider:focus-visible{outline:none}
+#settings-dialog .volume-slider:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px #57e3ee66,0 0 14px #ffc83ccc}
+#settings-dialog .volume-slider:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px #57e3ee66,0 0 14px #ffc83ccc}
+
+/* ---------- Calidad gráfica ---------- */
+.settings-quality{padding:10px 20px 10px 12px}
+.settings-quality-row{display:flex;align-items:center;gap:18px}
+.settings-quality .settings-label{flex:0 0 auto;min-width:170px}
+.settings-select{position:relative;flex:1;min-width:0}
+.settings-select select{width:100%;height:50px;box-sizing:border-box;padding:0 48px 0 18px;border-radius:12px;border:1.5px solid #8feaf077;background:#021e2dd9;color:#fff;
+  font:600 16px 'Baloo 2',sans-serif;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis}
+.settings-select select:focus{outline:none;border-color:var(--st-cyan);box-shadow:0 0 0 3px #57e3ee33}
+.settings-select select option{background:#062f40;color:#fff}
+.settings-select svg{position:absolute;right:16px;top:50%;width:20px;height:20px;transform:translateY(-50%);fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;pointer-events:none}
+.settings-quality .dialog-note{margin:8px 0 0 66px;font-size:13px;color:var(--st-text2);line-height:1.4}
+.settings-saved{margin:0;min-height:0;font-size:13px;font-weight:700;color:#aef4df;text-align:center}
+.settings-saved:empty{display:none}
+
+/* ---------- Pantallas bajas y móviles ---------- */
+@media (max-height:760px) and (min-width:641px){
+  .settings-shell{padding:18px 26px 12px;gap:9px}.settings-title{font-size:34px}.settings-icon{width:42px;height:42px}
+  #settings-dialog .volume-row{padding:4px 0;grid-template-columns:42px minmax(120px,190px) minmax(0,1fr) 74px}.settings-select select{height:44px}
+}
+@media (max-width:640px){
+  .settings-shell{padding:18px 14px 12px}.settings-title{font-size:30px}.settings-kicker,.settings-title{padding-right:56px}
+  .settings-toggle,.settings-quality{padding:8px 12px 8px 8px;gap:12px}.settings-icon{width:40px;height:40px}.settings-icon svg{width:22px;height:22px}
+  #settings-dialog .audio-settings{padding:12px 14px 6px}
+  /* El slider pasa a su propia fila, debajo del icono y el nombre. */
+  #settings-dialog .volume-row{grid-template-columns:40px minmax(0,1fr) 64px;gap:4px 12px}
+  #settings-dialog .volume-row .volume-slider{grid-column:1/-1;grid-row:2}
+  .settings-quality-row{flex-wrap:wrap;gap:10px 12px}.settings-quality .settings-label{min-width:0}.settings-select{flex-basis:100%}
+  .settings-quality .dialog-note{margin-left:0}
+}

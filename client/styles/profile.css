@@ -14,7 +14,7 @@
 .profile-left{display:flex;flex-direction:column;min-width:0}
 .profile-kicker{font-size:12px;font-weight:900;letter-spacing:5px;color:var(--pf-cyan);margin:4px 0 0 4px}
 .profile-title{display:flex;align-items:center;gap:12px;margin:0 0 10px 2px;font-size:clamp(34px,3.4vw,48px);font-weight:800;line-height:1.05;letter-spacing:-.5px;text-shadow:0 3px 12px #001b24bb}
-.profile-title img{width:48px;height:48px;object-fit:contain}
+.profile-title-wave{font-size:.82em;line-height:1;filter:drop-shadow(0 2px 6px #0008)}
 
 /* Escenario: la misma escena 3D de La tiendita (roca, palmeras y océano) con el equipo real. */
 .profile-stage{position:relative;height:clamp(300px,44dvh,440px);border-radius:20px;overflow:hidden;border:1px solid #a4eaff39;
@@ -156,7 +156,7 @@
   .profile-actions{flex-direction:column}.profile-secondary,.profile-secondary.is-logout{min-width:0;width:100%}
 }
 @media (max-width:560px){
-  .profile-shell{padding:16px 12px 12px}.profile-title{font-size:30px}.profile-title img{width:36px;height:36px}
+  .profile-shell{padding:16px 12px 12px}.profile-title{font-size:30px}
   .pf-benefits{grid-template-columns:1fr}.pf-wallet{grid-template-columns:1fr}.pf-equipment{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pf-provider-btn{font-size:16px;padding:0 48px}.pf-provider-btn .pf-logo{left:16px}.pf-link-btn{min-width:0}
   .profile-nick-row{flex-direction:column;align-items:stretch}.profile-nick-save{height:44px}.profile-shop-btn{font-size:18px}
