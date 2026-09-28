@@ -514,7 +514,12 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
   - **Cambio posterior (`controles-5`):** un `blur` ya no suelta A/D al momento. Solo se sueltan las teclas si 400 ms después `document.hasFocus()` sigue siendo falso. Si el blur era falso o el foco vuelve enseguida, el giro sigue como estaba.
     - La segunda captura del jugador mostraba `rep 0` y unos 20 pares keydown/keyup por segundo: su sistema manda la repetición de teclas como pares. Con eso, cada blur dejaba la tecla soltada.
     - El diagnóstico muestra ahora `focus` y `foco SÍ/NO`.
-  - **PENDIENTE:** confirmar con el jugador qué ventana aparece. Si es el atajo de Windows, desactivarlo en Configuración → Accesibilidad → Teclado, o decidir otra tecla de turbo.
+  - **Causa real (`controles-6`):** el equipo del jugador repite una tecla mantenida como **pares keydown/keyup** (sin `e.repeat`, unos 20 por segundo: `rep 0`, `down 547 up 544`). Cada keyup soltaba la dirección, así que entre pares la tecla contaba como suelta y el surfista avanzaba a trompicones o se quedaba quieto. No era el servidor: pasaba en práctica, sin conexión.
+    - **Arreglo:** un keyup solo suelta la dirección 150 ms (`KEY_HOLD_MS`) después del último keydown no repetido. Si antes llega otro keydown de la misma tecla, sigue pulsada. Pulsar la dirección contraria suelta la otra al instante.
+    - En un teclado normal, una tecla mantenida se suelta al levantar el dedo, porque su keydown es antiguo. Un toque corto gira al menos 150 ms.
+    - **Reproducido en Chromium** con pares keydown+keyup cada 50 ms: antes, x = 0,00 tras 7 ticks; ahora, 1,63, lo mismo que con la tecla mantenida.
+    - El diagnóstico muestra `pares` (keydown que llega justo después de un keyup de la misma tecla).
+  - **PENDIENTE:** confirmar con el jugador en su equipo, y ver qué ventana provoca los `blur`. Si es el atajo de Windows, desactivarlo en Configuración → Accesibilidad → Teclado, o decidir otra tecla de turbo.
 - **Salas:**
   - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
   - el código se muestra con una nota explicativa y queda más separado del botón "Crear sala de espera";
@@ -672,6 +677,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Causa real del frenazo al mantener A/D: repetición de teclas en pares
+- El equipo del jugador manda una tecla mantenida como pares keydown/keyup. Cada keyup soltaba la dirección. Ahora un keyup solo la suelta 150 ms después del último keydown. Reproducido en Chromium: antes no se movía; ahora se mueve igual que con la tecla mantenida.
 
 ### 2026-09-28 · Un blur ya no suelta A/D si el juego conserva el foco
 - Las teclas solo se sueltan si el foco sigue fuera 400 ms después. Probado: con un blur falso, D sigue moviendo al surfista; con una pérdida real de foco, se sueltan las teclas y sale el aviso.
