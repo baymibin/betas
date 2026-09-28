@@ -1693,7 +1693,7 @@ function inputAxis(p) { return steerAxis(p.x,SURF_LIMIT); }
 // Diagnóstico de controles: abre el juego con ?debug para ver en pantalla qué recibe el
 // navegador (teclas, de dónde sale el giro, posición y límite). Sirve para comparar lo que
 // pasa en el equipo del jugador con lo que debería pasar.
-const CLIENT_BUILD='controles-3';
+const CLIENT_BUILD='controles-4';
 const inputDebug=PARAMS.has('debug')?Object.assign(document.createElement('pre'),{id:'input-debug'}):null;
 const inputStats={down:0,repeat:0,up:0,blur:0,last:''};
 if(inputDebug){inputDebug.style.cssText='position:fixed;right:8px;top:200px;z-index:99;margin:0;padding:6px 8px;background:rgba(0,0,0,.72);color:#9ff;font:12px/1.35 monospace;pointer-events:none;white-space:pre';document.body.appendChild(inputDebug);}
@@ -1763,7 +1763,13 @@ const syncLookBack=e=>{const held=running&&(e.buttons&2)!==0;if(held&&e.type==='
 for(const type of ['pointerdown','pointermove','pointerup'])window.addEventListener(type,syncLookBack,true);
 window.addEventListener('pointercancel',()=>setLookBack(false),true);
 window.addEventListener('contextmenu',e=>{if(running)e.preventDefault();});
-window.addEventListener('blur',()=>{ inputStats.blur++;inputStats.last='blur (la ventana perdió el foco)'; keyState.left=false; keyState.right=false; spaceHeld=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
+// Si otra ventana se pone delante (p. ej. el aviso de Windows de "Teclas especiales" o
+// "Teclas filtro", que salta al pulsar Mayús 5 veces o mantenerla 8 s, o un overlay), el
+// navegador deja de mandar las teclas al juego y el surfista se para aunque A/D sigan pulsadas.
+// Se avisa en pantalla para que el jugador sepa que debe volver a hacer clic en el juego.
+window.addEventListener('focus',()=>document.body.classList.remove('game-unfocused'));
+window.addEventListener('pointerdown',()=>document.body.classList.remove('game-unfocused'),true);
+window.addEventListener('blur',()=>{ inputStats.blur++;inputStats.last='blur tras '+(inputStats.key||'-')+' (la ventana perdió el foco)'; if(running)document.body.classList.add('game-unfocused'); keyState.left=false; keyState.right=false; spaceHeld=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
 
 // El sonido del salto lo pone syncMovement cuando el salto ocurre de verdad (p.jumps sube):
 // antes sonaba también aquí, dos veces por salto, y en el aire aunque no se saltara.
@@ -1783,6 +1789,7 @@ window.addEventListener('keydown', function(e){
       return;
     }
   }
+  inputStats.key=e.key===' '?'Espacio':e.key;
   if(inputDebug&&/^(a|d|arrowleft|arrowright)$/i.test(e.key)){if(e.repeat)inputStats.repeat++;else inputStats.down++;inputStats.last='keydown '+e.key+(running?'':' (sin carrera)')+(isPaused?' (pausa)':'');}
   if(!running || isPaused) return;
   switch(e.key){

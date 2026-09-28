@@ -508,7 +508,10 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
     - la posición x frente al límite;
     - los contadores de keydown / repeticiones / keyup / blur, y el último evento.
   - Sirve para ver en el equipo del jugador por qué se frena al mantener A/D: en Chromium (práctica y en línea, también con la repetición de teclas) se llega de borde a borde.
-  - **PENDIENTE:** el jugador informa de que en su equipo se sigue frenando a ~1 s. Falta su captura con `?debug`.
+  - **Causa encontrada con las capturas del jugador:** la ventana del juego **pierde el foco** en plena carrera (`blur 2`, luego `blur 5`, con A/D pulsada). Desde ese momento el navegador ya no manda las teclas al juego y el surfista se para. No es un fallo de la simulación.
+  - Qué le quita el foco está fuera del juego. Sospecha principal: el aviso de Windows de "Teclas especiales" / "Teclas filtro", que salta al pulsar Mayús (turbo) 5 veces seguidas o al mantenerla 8 s. También puede ser un overlay (Xbox Game Bar, Discord, NVIDIA).
+  - Aviso nuevo: "El juego perdió el foco…" en el centro de la pantalla hasta hacer clic. El diagnóstico muestra la última tecla antes del blur (`blur tras Shift`).
+  - **PENDIENTE:** confirmar con el jugador qué ventana aparece. Si es el atajo de Windows, desactivarlo en Configuración → Accesibilidad → Teclado, o decidir otra tecla de turbo.
 - **Salas:**
   - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
   - el código se muestra con una nota explicativa y queda más separado del botón "Crear sala de espera";
@@ -666,6 +669,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Frenazo al mantener A/D: la ventana pierde el foco
+- Las capturas con `?debug` muestran `blur` en plena carrera: otra ventana se pone delante y las teclas dejan de llegar. Aviso en pantalla "El juego perdió el foco… haz clic" y registro de la última tecla antes del blur.
 
 ### 2026-09-28 · Diagnóstico de controles (?debug) y versión del cliente
 - Recuadro en pantalla con teclas, origen del giro, x y límite, y eventos de teclado. Sirve para localizar en el equipo del jugador el frenazo al mantener A/D, que no se reproduce en Chromium.
