@@ -1,42 +1,49 @@
 ﻿:root { --coral:#ff7054; }
 #nickname {box-sizing:border-box;width:100%;padding:14px 16px;margin:6px 0 16px;border:1px solid #ffffff40;border-radius:12px;background:#042a36;color:white;font:inherit;outline-offset:3px;}
 .nick-label {display:block;text-align:left;font-size:11px;letter-spacing:2px;color:#a9d7db;}
+/* Pausa (ESC): mismo cristal que los demás modales y los botones del juego: dorado como JUGAR
+   y el secundario del menú. (Antes "font: 900 16px inherit" era inválido y caía en la fuente del sistema.) */
 .pause-dialog {
-  border: 1px solid #62e5c566;
-  border-radius: 24px;
-  background: #042533fa;
-  color: #eaf6f4;
-  padding: 32px 28px;
-  width: min(380px, 90vw);
-  box-shadow: 0 20px 50px #001724cc, 0 0 30px #2be3cd33;
-  backdrop-filter: blur(12px);
+  border: 1px solid #b8f3ff78;
+  border-radius: 26px;
+  background: linear-gradient(160deg, #06384ef2, #032536f5);
+  color: #f6ffff;
+  padding: 30px 28px 26px;
+  width: min(400px, 90vw);
+  box-shadow: 0 26px 90px #00131dbb, inset 0 0 0 1px #ffffff25;
   text-align: center;
-  font-family: inherit;
+  font-family: 'Baloo 2', sans-serif;
 }
 .pause-dialog::backdrop {
-  background: #00121bd9;
+  background: #00121bcc;
   backdrop-filter: blur(8px);
 }
 .pause-tag {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 3px;
-  color: #64f3d6;
+  display: inline-block;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe28a, #f7b92f);
+  color: #3b2400;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
   margin-bottom: 8px;
+  box-shadow: 0 4px 12px #f7b92f44;
 }
 .pause-title {
-  font-size: 42px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  margin: 0 0 10px;
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin: 0 0 6px;
   color: #ffffff;
-  text-shadow: 0 3px 0 #064b5c;
+  text-shadow: 0 3px 12px #001b24bb;
 }
 .pause-desc {
-  color: #afd4dc;
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0 0 24px;
+  color: #b8d4df;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 0 0 22px;
 }
 .pause-btns {
   display: flex;
@@ -44,32 +51,40 @@
   gap: 12px;
 }
 .pause-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  padding: 14px 20px;
   border-radius: 14px;
-  font: 900 16px inherit;
-  letter-spacing: 1.5px;
+  font-family: 'Baloo 2', sans-serif;
   cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s, background 0.15s;
+  transition: transform .15s, box-shadow .15s, filter .15s;
 }
-.pause-btn:hover {
-  transform: translateY(-2px);
-}
+.pause-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.pause-btn:active { transform: translateY(1px); }
+.pause-btn:focus-visible { outline: 2px solid #ffffffcc; outline-offset: 3px; }
+/* = #start-btn (JUGAR) */
 .pause-btn.resume {
-  background: linear-gradient(135deg, #2ee6c8, #18bfa3);
-  color: #03232d;
-  border: 1px solid #75ffd8;
-  box-shadow: 0 4px 15px #1bc2a655;
+  height: 58px;
+  border: 1px solid #fff0b0;
+  background: linear-gradient(180deg, var(--gold-a, #ffe27d), var(--gold-b, #ffc23d));
+  color: var(--ink-dark, #13262d);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  box-shadow: 0 0 24px #ffc83c80, 0 8px 18px #00121c66, inset 0 2px 0 #fffbe0;
 }
+/* = .play-secondary (Jugar en solitario / Cerrar sesión) */
 .pause-btn.quit {
-  background: #093747;
-  color: #ff9b86;
-  border: 1px solid #ff705455;
+  height: 50px;
+  border: 1px solid #8feaf088;
+  background: linear-gradient(180deg, #0f5b6e, #0a4152);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 6px 16px #00121c55, inset 0 1px 0 #ffffff26;
 }
-.pause-btn.quit:hover {
-  background: #ff705422;
-  border-color: #ff7054aa;
-}
+.pause-btn.quit:hover { border-color: #b8f3ff; }
 #shop-dialog {width:min(1190px,96vw);max-width:none;max-height:94dvh;box-sizing:border-box;padding:0;overflow:hidden;border:1px solid #b8f3ff78;border-radius:30px;background:#082e3b;color:#f6ffff;font-family:inherit;box-shadow:0 26px 90px #00131dbb, inset 0 0 0 1px #ffffff25;}
 #shop-dialog::backdrop {background:linear-gradient(#001d2c88,#001725bb),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;backdrop-filter:blur(9px);}
 .shop-shell {height:min(680px,91dvh);min-height:520px;display:flex;flex-direction:column;padding:20px 24px 18px;box-sizing:border-box;background:linear-gradient(115deg,#062c40ee 0%,#063a4cde 50%,#074253a8 100%),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;}

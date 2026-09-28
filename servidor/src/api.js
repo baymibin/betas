@@ -7,8 +7,8 @@
 //   GET  /api/coins/packages · POST /api/coins/exchange · GET /api/wallet/transactions
 //   GET  /api/payments/products · POST /api/payments/checkout · POST /api/payments/webhook/:provider
 //   POST /api/account/nickname · POST /api/account/unlink · POST /api/account/migrate-local
-//   GET  /api/trade/summary · /api/trade/inventory · /api/trade/user?code= · /api/trade/offers?box= · /api/trade/blocked
-//   POST /api/trade/offers · /api/trade/accept · /api/trade/decline · /api/trade/cancel · /api/trade/block · /api/trade/unblock
+//   GET  /api/trade/summary · /api/trade/inventory · /api/trade/user?code= · /api/trade/offers?box= · /api/trade/blocked · /api/trade/listings?mine=1
+//   POST /api/trade/offers · /api/trade/listings · /api/trade/listings/withdraw · /api/trade/accept · /api/trade/decline · /api/trade/cancel · /api/trade/block · /api/trade/unblock
 // Toda petición que cambia algo exige sesión + cabecera X-CSRF-Token + Origin propio.
 import {EconomyError} from './economy.js';
 import {SESSION_COOKIE, BROWSER_COOKIE} from './auth.js';
@@ -114,6 +114,8 @@ export function mountApi(app, {auth, economy, trade, config, onEquipmentChanged 
     };
   };
   const providers = () => ({google: auth.enabled('google'), discord: auth.enabled('discord')});
+  // Enlaces públicos del menú. Solo se publica una URL https (p. ej. la invitación al Discord).
+  const links = () => ({discord: /^https:\/\/\S+$/.test(env.DISCORD_INVITE_URL || '') ? env.DISCORD_INVITE_URL : null});
 
   // ---------- Autenticación ----------
   for (const provider of ['google', 'discord']) {
@@ -146,8 +148,8 @@ export function mountApi(app, {auth, economy, trade, config, onEquipmentChanged 
   // ---------- Cuenta ----------
   route('get', '/api/me', async ctx => {
     const payments_ = {enabled: !!payments.enabled};
-    if (!ctx.userId) return {json: {authenticated: false, providers: providers(), payments: payments_}};
-    return {json: {...await profileOf(ctx.userId), csrf: ctx.session.csrf, providers: providers(), payments: payments_}};
+    if (!ctx.userId) return {json: {authenticated: false, providers: providers(), payments: payments_, links: links()}};
+    return {json: {...await profileOf(ctx.userId), csrf: ctx.session.csrf, providers: providers(), payments: payments_, links: links()}};
   });
   route('post', '/api/account/nickname', async ctx => {
     const nickname = await economy.setNickname(ctx.userId, ctx.body.nickname);
@@ -189,7 +191,11 @@ export function mountApi(app, {auth, economy, trade, config, onEquipmentChanged 
     route('get', '/api/trade/offers', async ctx => ({json: {offers: await trade.list(need(ctx), str(ctx.query.box || 'received'))}}));
     route('get', '/api/trade/blocked', async ctx => ({json: {blocked: await trade.blocked(need(ctx))}}));
     route('post', '/api/trade/offers', async ctx => ({json: await trade.create(ctx.userId, {toCode: ctx.body.toCode, offer: ctx.body.offer, request: ctx.body.request,
-      requestId: ctx.body.requestId, parentId: ctx.body.parentId ? str(ctx.body.parentId) : null})}), {group: 'write'});
+      requestId: ctx.body.requestId, parentId: ctx.body.parentId ? str(ctx.body.parentId) : null, listingId: ctx.body.listingId ? str(ctx.body.listingId) : null})}), {group: 'write'});
+    // Trades públicos (tablón)
+    route('get', '/api/trade/listings', async ctx => ({json: {listings: await trade.listings(need(ctx), {mine: ctx.query.mine === '1'})}}));
+    route('post', '/api/trade/listings', async ctx => ({json: await trade.publish(ctx.userId, {offer: ctx.body.offer, want: ctx.body.want ?? [], requestId: ctx.body.requestId})}), {group: 'write'});
+    route('post', '/api/trade/listings/withdraw', async ctx => ({json: await trade.withdrawListing(ctx.userId, str(ctx.body.listingId))}), {group: 'write'});
     route('post', '/api/trade/accept', async ctx => {
       const result = await trade.accept(ctx.userId, str(ctx.body.offerId), str(ctx.body.contentHash));
       // Lo entregado se desequipa: las salas abiertas de las dos cuentas se actualizan.

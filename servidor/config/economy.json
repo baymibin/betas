@@ -17,11 +17,13 @@
   },
 
   "trade": {
-    "_comment": "Trade: intercambio de items por items (sin monedas) entre cuentas registradas. Solo items poseídos y no gratuitos. minAccountAgeHours = antigüedad mínima de la cuenta para usarlo (0 para pruebas locales). dailyTradeLimit = trades completados por cuenta y día (UTC). untradeable = ids que nunca se pueden intercambiar.",
+    "_comment": "Trade: intercambio de items por items (sin monedas) entre cuentas registradas. Solo items poseídos y no gratuitos. minAccountAgeHours = antigüedad mínima de la cuenta para usarlo (0 para pruebas locales). dailyTradeLimit = trades completados por cuenta y día (UTC). untradeable = ids que nunca se pueden intercambiar. maxOpenListings / listingTTLHours = publicaciones abiertas por cuenta en Trades públicos y su duración (168 h = 7 días).",
     "enabled": true,
     "maxItemsPerSide": 4,
     "maxOpenOffers": 10,
     "offerTTLHours": 72,
+    "maxOpenListings": 5,
+    "listingTTLHours": 168,
     "minAccountAgeHours": 24,
     "dailyTradeLimit": 20,
     "untradeable": []

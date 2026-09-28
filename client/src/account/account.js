@@ -3,7 +3,7 @@
 // Sin sesión se juega como invitado (nick y equipamiento gratuito guardados en el navegador).
 import {profile} from '../ui/shop.js';
 
-const state = {loaded: false, authenticated: false, providers: {google: false, discord: false}, payments: {enabled: false},
+const state = {loaded: false, authenticated: false, providers: {google: false, discord: false}, payments: {enabled: false}, links: {discord: null},
   user: null, identities: [], wallet: {NORMAL_COIN: 0, GOLD_COIN: 0}, inventory: [], equipped: null, csrf: null, tradeCode: null};
 export const account = state;
 const emit = () => document.dispatchEvent(new CustomEvent('surf:account', {detail: state}));
@@ -44,6 +44,10 @@ export const MESSAGES = {
   offer_expired: 'La oferta caducó.',
   items_changed: 'Los items de la oferta cambiaron de dueño: ya no es válida.',
   daily_trade_limit: 'Se alcanzó el máximo de trades por hoy.',
+  listing_not_found: 'Esa publicación ya no existe.',
+  listing_closed: 'Esa publicación ya no está disponible.',
+  listing_exists: 'Ya tienes publicada esa misma oferta.',
+  too_many_listings: 'Tienes demasiadas publicaciones abiertas. Retira alguna antes.',
   network: 'Sin conexión con el servidor.',
   server_error: 'Error del servidor. Inténtalo de nuevo.'
 };
@@ -74,7 +78,7 @@ function applyEquipment(equipped) {
 export async function refresh() {
   try {
     const me = await api('/api/me');
-    Object.assign(state, {loaded: true, authenticated: !!me.authenticated, providers: me.providers || state.providers, payments: me.payments || state.payments});
+    Object.assign(state, {loaded: true, authenticated: !!me.authenticated, providers: me.providers || state.providers, payments: me.payments || state.payments, links: me.links || state.links});
     if (me.authenticated) {
       Object.assign(state, {user: me.user, identities: me.identities, wallet: me.wallet, inventory: me.inventory, equipped: me.equipped, csrf: me.csrf, tradeCode: me.tradeCode || null});
       profile.nick = me.user.nickname;
@@ -133,7 +137,10 @@ export const trade = {
   user: code => api('/api/trade/user?code=' + encodeURIComponent(code)),
   offers: box => api('/api/trade/offers?box=' + box),
   blocked: () => api('/api/trade/blocked'),
-  create: ({toCode, offer, request, parentId = null}, id = requestId()) => api('/api/trade/offers', {method: 'POST', body: {toCode, offer, request, parentId, requestId: id}}),
+  create: ({toCode, offer, request, parentId = null, listingId = null}, id = requestId()) => api('/api/trade/offers', {method: 'POST', body: {toCode, offer, request, parentId, listingId, requestId: id}}),
+  listings: (mine = false) => api('/api/trade/listings' + (mine ? '?mine=1' : '')),
+  publish: ({offer, want}, id = requestId()) => api('/api/trade/listings', {method: 'POST', body: {offer, want, requestId: id}}),
+  withdrawListing: listingId => api('/api/trade/listings/withdraw', {method: 'POST', body: {listingId}}),
   async accept(offerId, contentHash) {
     const r = await api('/api/trade/accept', {method: 'POST', body: {offerId, contentHash}});
     await refresh();   // cambian inventario y equipamiento
