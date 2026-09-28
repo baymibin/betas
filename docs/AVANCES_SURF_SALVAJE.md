@@ -486,6 +486,10 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
   - Pulsar **E** mientras gira solo la **para** y muestra el poder; hay que volver a pulsar E para usarlo. Si no se pulsa, la ruleta se para sola.
   - Es una regla de la simulación (servidor, práctica y predicción del cliente, igual en los tres) y viaja en el SNAPSHOT (byte libre 106, sin cambiar la versión del protocolo). Los bots esperan a ver su poder.
 - **Mirar atrás (clic derecho sostenido):** antes nunca se activaba sobre el juego, porque Babylon cancela los `mousedown` del canvas. Ahora usa eventos pointer y muestra el aviso "MIRANDO ATRÁS".
+- **Corrección posterior (mismo día):**
+  - La ruleta guarda el tick de carrera en que termina (`itemRollEnd` frente a `raceTicks`), no una cuenta atrás que solo bajaba en el servidor. Así el servidor y la predicción del cliente deciden lo mismo con cada E.
+  - Antes, al pulsar E justo al final, el cliente paraba la ruleta mientras el servidor ya usaba el poder. La corrección llegaba tarde: el delfín saltaba después, y había tirones.
+  - "Mirar atrás" lee el estado real de los botones (`e.buttons`). Antes, si se soltaba el derecho con otro botón pulsado, no llegaba `pointerup` y la cámara se quedaba mirando atrás (girar a los lados parecía trabado).
 - **Salas:**
   - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
   - el código se muestra con una nota explicativa y queda más separado del botón "Crear sala de espera";
@@ -643,6 +647,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Arreglo de la ruleta de poderes y de "mirar atrás"
+- Ruleta por tick de carrera: el servidor y la predicción coinciden en cada pulsación de E (nueva prueba que lo comprueba alrededor del final de la ruleta). "Mirar atrás" ya no se queda activado.
 
 ### 2026-09-28 · Panel administrativo y ajustes del juego
 - Panel `/admin` con usuario y contraseña. Permite ver usuarios, compras, movimientos y trades; ajustar monedas, entregar y quitar items y revertir trades; editar la tienda; subir tablas, wings y hats; y editar paquetes de monedas y recompensas. Migración 004.

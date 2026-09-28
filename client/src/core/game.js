@@ -1729,9 +1729,12 @@ function updatePractice(dt) {
 // Mirar atrás (clic derecho sostenido). Con eventos pointer y en captura: Babylon hace
 // preventDefault en pointerdown del canvas y eso anula los mousedown/mouseup de compatibilidad,
 // por eso con 'mousedown' nunca se activaba sobre el juego.
-const setLookBack=v=>{lookBack=v;document.body.classList.toggle('looking-back',v);};
-window.addEventListener('pointerdown',e=>{if(e.button===2&&running){setLookBack(true);e.preventDefault();}},true);
-window.addEventListener('pointerup',e=>{if(e.button===2)setLookBack(false);},true);
+// Se mira el estado real de los botones (e.buttons) en cada evento: si se suelta el derecho con
+// otro botón pulsado, el navegador no manda pointerup sino pointermove, y antes la cámara se
+// quedaba mirando atrás (y girar a los lados parecía trabado).
+const setLookBack=v=>{if(lookBack===v)return;lookBack=v;document.body.classList.toggle('looking-back',v);};
+const syncLookBack=e=>{const held=running&&(e.buttons&2)!==0;if(held&&e.type==='pointerdown')e.preventDefault();setLookBack(held);};
+for(const type of ['pointerdown','pointermove','pointerup'])window.addEventListener(type,syncLookBack,true);
 window.addEventListener('pointercancel',()=>setLookBack(false),true);
 window.addEventListener('contextmenu',e=>{if(running)e.preventDefault();});
 window.addEventListener('blur',()=>{ keyState.left=false; keyState.right=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });

@@ -54,7 +54,7 @@ export function snapshot(players, tick) {
     writeName(v,o+30,p.nick||'Surfer');
     v.setFloat32(o+64,p.impulse||0,true);
     v.setUint8(o+68,p.mapId||0);v.setUint8(o+69,p.place||0);v.setUint16(o+70,p.countdown||0,true);
-    v.setUint32(o+72,p.raceTicks||0,true);v.setUint16(o+76,p.ramps||0,true);v.setUint16(o+78,p.jumps||0,true);v.setUint8(o+80,p.trick||0);v.setUint8(o+81,p.heldItem||0);v.setUint8(o+82,p.wing||0);v.setUint8(o+83,p.hat||0);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>v.setUint16(o+84+j*2,p[key]||0,true));v.setUint32(o+100,p.slipTarget||0,true);v.setUint8(o+104,p.slipActive||0);v.setUint8(o+105,p.bot?1:0);v.setUint8(o+106,Math.min(255,p.itemRoll||0));
+    v.setUint32(o+72,p.raceTicks||0,true);v.setUint16(o+76,p.ramps||0,true);v.setUint16(o+78,p.jumps||0,true);v.setUint8(o+80,p.trick||0);v.setUint8(o+81,p.heldItem||0);v.setUint8(o+82,p.wing||0);v.setUint8(o+83,p.hat||0);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>v.setUint16(o+84+j*2,p[key]||0,true));v.setUint32(o+100,p.slipTarget||0,true);v.setUint8(o+104,p.slipActive||0);v.setUint8(o+105,p.bot?1:0);v.setUint8(o+106,Math.max(0,Math.min(255,(p.itemRollEnd||0)-(p.raceTicks||0))));
   }); return v.buffer;
 }
 export function states(v) {
@@ -64,7 +64,7 @@ export function states(v) {
     const o = 14 + i * 108, p = { id:v.getUint32(o,true), seq:v.getUint32(o+4,true),character:v.getUint8(o+28),board:v.getUint8(o+29),wing:v.getUint8(o+82),hat:v.getUint8(o+83),nick:readName(v,o+30),impulse:v.getFloat32(o+64,true) };
     Object.assign(p,{mapId:v.getUint8(o+68),place:v.getUint8(o+69),countdown:v.getUint16(o+70,true),raceTicks:v.getUint32(o+72,true),ramps:v.getUint16(o+76,true),jumps:v.getUint16(o+78,true),trick:v.getUint8(o+80)});
     ['x','z','y','vy','energy'].forEach((k,j) => { p[k] = v.getFloat32(o+8+j*4,true); });
-    p.heldItem=v.getUint8(o+81);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>p[key]=v.getUint16(o+84+j*2,true));p.slipTarget=v.getUint32(o+100,true);p.slipActive=v.getUint8(o+104);p.bot=v.getUint8(o+105);p.itemRoll=v.getUint8(o+106);return p;
+    p.heldItem=v.getUint8(o+81);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>p[key]=v.getUint16(o+84+j*2,true));p.slipTarget=v.getUint32(o+100,true);p.slipActive=v.getUint8(o+104);p.bot=v.getUint8(o+105);p.itemRollEnd=p.raceTicks+v.getUint8(o+106);return p;
   });
 }
 function writeName(v,offset,name) {

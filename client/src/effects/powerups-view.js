@@ -1,4 +1,4 @@
-import {ITEMS} from '../shared/powerups.js';
+import {ITEMS,itemRolling} from '../shared/powerups.js';
 import {trackFrame} from '../shared/track.js';
 import {settings,playSound} from '../ui/home-ui.js';
 
@@ -419,10 +419,10 @@ export function createPowerView(B, scene, use) {
       });
 
       // Ability Roulette & Display
-      // La ruleta la decide la simulación (p.itemRoll, igual en servidor y práctica): gira
-      // hasta que se agota o se pulsa E; solo entonces el poder queda listo para usarse.
+      // La ruleta la decide la simulación (itemRollEnd frente a raceTicks, igual en servidor,
+      // práctica y predicción): gira hasta su tick final o hasta que se pulsa E.
       lastItem = p.heldItem;
-      const rolling = !!p.heldItem && p.itemRoll > 0;
+      const rolling = itemRolling(p);
       const kind = rolling ? 1 + Math.floor(time * 12) % 8 : p.heldItem;
       const isPending = !!p.heldItem;
 

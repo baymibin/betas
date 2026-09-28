@@ -25,21 +25,26 @@ export function applySelfPower(p,kind){
 }
 // Ruleta al coger una caja (como en Mario Kart): durante ITEM_ROLL_TICKS gira sola; pulsar E
 // mientras gira solo la para y muestra el poder, y hay que volver a pulsar E para usarlo.
+// Se guarda el tick de carrera en que termina (itemRollEnd, comparado con raceTicks) y no una
+// cuenta atrás: así el servidor y la predicción del cliente, que avanzan raceTicks igual con
+// cada entrada, deciden lo mismo para cada pulsación de E (antes, al pulsar E justo al final,
+// uno paraba la ruleta y el otro usaba el poder, y la corrección llegaba tarde).
 export const ITEM_ROLL_TICKS=75;
+export const itemRolling=p=>!!p.heldItem&&(p.itemRollEnd||0)>(p.raceTicks||0);
 // Predicción local del uso de la habilidad propia: solo las que no dependen de otros jugadores.
 // Mismas condiciones que stepPowerWorld (participante activo y con la habilidad en la mano).
 export function predictSelfPower(p){
  const kind=p.heldItem;
  if(!kind||p.countdown!==0||p.place||-p.z>=LAP_LENGTH*TOTAL_LAPS)return;
- if(p.itemRoll>0){p.itemRoll=0;return;}
+ if(itemRolling(p)){p.itemRollEnd=p.raceTicks||0;return;}
  if(kind!==1&&kind!==2&&kind!==7)return;
  if(applySelfPower(p,kind))p.heldItem=0;
 }
 export function stepPowerWorld(world,players,uses=[],random=Math.random){
  const active=players.filter(p=>p.countdown===0&&!p.place&&-p.z<2880);
  for(const p of active){
-  // Ruleta girando: E la para (sin usar el poder); si no, se va agotando sola.
-  if(p.heldItem&&p.itemRoll>0){if(uses.includes(p.id))p.itemRoll=0;else p.itemRoll--;}
+  // Ruleta girando: E solo la para (sin usar el poder); si no, termina sola en itemRollEnd.
+  if(itemRolling(p)){if(uses.includes(p.id))p.itemRollEnd=p.raceTicks||0;}
   else if(uses.includes(p.id)&&p.heldItem){
    const kind=p.heldItem;p.heldItem=0;
    const spawn=(target=0,ttl=30)=>world.entities.push({id:world.nextId++,kind,owner:p.id,target,x:p.x,z:p.z,y:p.y+.7,ttl});
@@ -62,7 +67,7 @@ export function stepPowerWorld(world,players,uses=[],random=Math.random){
    return (crossed||overlap)&&Math.abs(p.x-box.x)<1.45&&Math.abs(p.y+.8-box.y)<1.35;
   });
   contenders.sort((a,b)=>{const az=world.previous.get(a.id)??a.z,bz=world.previous.get(b.id)??b.z;return (az-box.z)/(az-a.z||1)-(bz-box.z)/(bz-b.z||1)||a.id-b.id;});
-  const p=contenders[0];if(p){world.taken.add(box.id);const pool=ahead(p,active)?[1,2,2,3,4,5,6,7,8]:[1,2,4,5,6,7];p.heldItem=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];p.itemRoll=ITEM_ROLL_TICKS;}
+  const p=contenders[0];if(p){world.taken.add(box.id);const pool=ahead(p,active)?[1,2,2,3,4,5,6,7,8]:[1,2,4,5,6,7];p.heldItem=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];p.itemRollEnd=(p.raceTicks||0)+ITEM_ROLL_TICKS;}
  }
  for(const e of world.entities){e.age=(e.age||0)+1;if(e.kind!==5&&e.kind!==4)e.ttl--;
   if(e.kind===3){const target=active.find(p=>p.id===e.target);if(!target){e.ttl=0;continue;}
