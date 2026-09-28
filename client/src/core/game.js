@@ -1452,6 +1452,21 @@ function curveSlopeAt(worldZ){
 let lateralOffset = 0;
 let mouseNormX = 0, lastMouseMoveT = -10;
 const keyState = { left: false, right: false };
+// Algunos equipos repiten una tecla mantenida como pares keydown/keyup (sin e.repeat): entre
+// cada par la tecla parecía soltada y el surfista avanzaba a trompicones o se paraba. Un keyup
+// solo suelta de verdad la dirección KEY_HOLD_MS después del último keydown; si antes llega
+// otro keydown de la misma tecla, sigue pulsada sin cortes. En un teclado normal, una
+// pulsación mantenida se suelta al instante al levantar el dedo (su keydown es antiguo).
+const KEY_HOLD_MS = 150;
+const keyDownAt = { left: -1e9, right: -1e9 }, keyUpAt = { left: -1e9, right: -1e9 };
+const steerHeld = side => keyState[side] || performance.now() < keyDownAt[side] + KEY_HOLD_MS;
+function pressSteer(side, repeat){
+  const other = side === 'left' ? 'right' : 'left', now = performance.now();
+  if(!repeat){ if(!keyState[side] && now - keyUpAt[side] < KEY_HOLD_MS) inputStats.pairs = (inputStats.pairs||0) + 1; keyDownAt[side] = now; }
+  keyState[side] = true; keyDownAt[other] = -1e9;   // la otra dirección se suelta ya, sin esperar
+}
+function releaseSteer(side){ keyState[side] = false; keyUpAt[side] = performance.now(); }
+function clearSteer(){ keyState.left = keyState.right = false; keyDownAt.left = keyDownAt.right = -1e9; }
 let isJumping = false, jumpVel = 0, airY = 0, airClock = 0, spinAngle = 0;
 let isSliding = false, slideTimer = 0;
 let running = false, distance = 0, pearlCount = 0, points = 0;
@@ -1638,7 +1653,7 @@ document.addEventListener('surf:appearance',()=>{applyAppearance();net.sendProfi
 applyAppearance();
 document.addEventListener('surf:menu',()=>{
   resumeGame();
-  online=false;running=false;stopMatchAudio();net.close();raceUI.hide();powerView.hide();keyState.left=false;keyState.right=false;boostHeld=false;throttleHeld=false;
+  online=false;running=false;stopMatchAudio();net.close();raceUI.hide();powerView.hide();clearSteer();boostHeld=false;throttleHeld=false;
   for(const rival of rivals.values()) rival.setEnabled(false);
   clearPracticeBots();
   overlay.classList.remove('hidden');startBtn.disabled=false;
@@ -1685,24 +1700,24 @@ function drawRivals(samples,dt) {
 // ratón, que tiraba del surfista hacia la X del puntero (casi siempre el centro): se movía un
 // poco y se frenaba, y había que pulsar varias veces.
 function steerAxis(x,limit) {
-  const keys=(keyState.left?1:0)-(keyState.right?1:0);
-  if(keyState.left||keyState.right||(elapsed-lastMouseMoveT)>=.22)return keys;
+  const left=steerHeld('left'),right=steerHeld('right'),keys=(left?1:0)-(right?1:0);
+  if(left||right||(elapsed-lastMouseMoveT)>=.22)return keys;
   return Math.max(-1,Math.min(1,(-mouseNormX*limit-x)*2));
 }
 function inputAxis(p) { return steerAxis(p.x,SURF_LIMIT); }
 // Diagnóstico de controles: abre el juego con ?debug para ver en pantalla qué recibe el
 // navegador (teclas, de dónde sale el giro, posición y límite). Sirve para comparar lo que
 // pasa en el equipo del jugador con lo que debería pasar.
-const CLIENT_BUILD='controles-5';
+const CLIENT_BUILD='controles-6';
 const inputDebug=PARAMS.has('debug')?Object.assign(document.createElement('pre'),{id:'input-debug'}):null;
 const inputStats={down:0,repeat:0,up:0,blur:0,last:''};
 if(inputDebug){inputDebug.style.cssText='position:fixed;right:8px;top:200px;z-index:99;margin:0;padding:6px 8px;background:rgba(0,0,0,.72);color:#9ff;font:12px/1.35 monospace;pointer-events:none;white-space:pre';document.body.appendChild(inputDebug);}
 console.info('[surf] cliente',CLIENT_BUILD);
 function showInputDebug(p,axis,limit){
   if(!inputDebug||elapsed-(inputDebug.at||0)<.1)return;inputDebug.at=elapsed;
-  const mouse=!(keyState.left||keyState.right)&&(elapsed-lastMouseMoveT)<.22;
+  const mouse=!(steerHeld('left')||steerHeld('right'))&&(elapsed-lastMouseMoveT)<.22;
   inputDebug.textContent=`versión ${CLIENT_BUILD} · ${online?'en línea':'práctica'}\n`+
-    `teclas  izq ${keyState.left?'SÍ':'no'}  der ${keyState.right?'SÍ':'no'}\n`+
+    `teclas  izq ${steerHeld('left')?'SÍ':'no'}  der ${steerHeld('right')?'SÍ':'no'}  pares ${inputStats.pairs||0}\n`+
     `giro    ${axis.toFixed(2)} (${mouse?'RATÓN':'teclado'})\n`+
     `x       ${p.x.toFixed(2)} / límite ±${limit.toFixed(1)}\n`+
     `eventos down ${inputStats.down} rep ${inputStats.repeat} up ${inputStats.up} blur ${inputStats.blur} focus ${inputStats.focus||0} · foco ${document.hasFocus()?'SÍ':'NO'}\n`+
@@ -1772,7 +1787,7 @@ window.addEventListener('contextmenu',e=>{if(running)e.preventDefault();});
 // y el surfista se paraba aunque la tecla siguiera pulsada. Ahora solo se sueltan las teclas si
 // el foco sigue fuera 400 ms después; si vuelve antes, el control sigue como estaba.
 let blurTimer=0;
-function releaseAllInput(){keyState.left=false;keyState.right=false;spaceHeld=false;boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0;}
+function releaseAllInput(){clearSteer();spaceHeld=false;boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0;}
 window.addEventListener('focus',()=>{clearTimeout(blurTimer);inputStats.focus=(inputStats.focus||0)+1;document.body.classList.remove('game-unfocused');});
 window.addEventListener('pointerdown',()=>document.body.classList.remove('game-unfocused'),true);
 window.addEventListener('blur',()=>{
@@ -1808,8 +1823,8 @@ window.addEventListener('keydown', function(e){
   if(inputDebug&&/^(a|d|arrowleft|arrowright)$/i.test(e.key)){if(e.repeat)inputStats.repeat++;else inputStats.down++;inputStats.last='keydown '+e.key+(running?'':' (sin carrera)')+(isPaused?' (pausa)':'');}
   if(!running || isPaused) return;
   switch(e.key){
-    case 'ArrowLeft': case 'a': case 'A': keyState.left = true; anchorMouse(); e.preventDefault(); break;
-    case 'ArrowRight': case 'd': case 'D': keyState.right = true; anchorMouse(); e.preventDefault(); break;
+    case 'ArrowLeft': case 'a': case 'A': pressSteer('left',e.repeat); anchorMouse(); e.preventDefault(); break;
+    case 'ArrowRight': case 'd': case 'D': pressSteer('right',e.repeat); anchorMouse(); e.preventDefault(); break;
     case ' ': if(!e.repeat&&!spaceHeld)doJump(); spaceHeld=true; e.preventDefault(); break;
     case 'e': case 'E': if(!e.repeat){if(online)net.buttons|=4;else localButtons|=4;}e.preventDefault();break;
     case 'Shift': case 'ShiftLeft': case 'ShiftRight': boostHeld=true; e.preventDefault(); break;
@@ -1824,8 +1839,8 @@ window.addEventListener('keyup', function(e){
     case ' ': spaceHeld=false; break;
     case 'Shift': case 'ShiftLeft': case 'ShiftRight': boostHeld=false; net.boostHeld=false; break;
     case 'ArrowUp': case 'w': case 'W': throttleHeld=false; if(net)net.throttleHeld=false; break;
-    case 'ArrowLeft': case 'a': case 'A': keyState.left = false; anchorMouse(); break;
-    case 'ArrowRight': case 'd': case 'D': keyState.right = false; anchorMouse(); break;
+    case 'ArrowLeft': case 'a': case 'A': releaseSteer('left'); anchorMouse(); break;
+    case 'ArrowRight': case 'd': case 'D': releaseSteer('right'); anchorMouse(); break;
   }
 });
 
