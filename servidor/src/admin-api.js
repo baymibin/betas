@@ -3,6 +3,7 @@
 // son JSON sin caché. La subida de imágenes admite cuerpos de hasta 12 MB; el resto, 64 KB.
 import {EconomyError} from './economy.js';
 import {parseCookies, createRateLimiter} from './api.js';
+import {clientIp} from './audit.js';
 
 export function mountAdmin(app, {admin, config}) {
   const origin = new URL(config.publicUrl).origin;
@@ -15,7 +16,7 @@ export function mountAdmin(app, {admin, config}) {
       const ctx = {
         query: Object.fromEntries(new URLSearchParams(req.getQuery() || '')),
         cookies: parseCookies(req.getHeader('cookie')), origin: req.getHeader('origin'), referer: req.getHeader('referer'),
-        csrf: req.getHeader('x-admin-csrf'), ip: Buffer.from(res.getRemoteAddressAsText()).toString()
+        csrf: req.getHeader('x-admin-csrf'), ip: clientIp(res, req)
       };
       const send = out => {
         if (aborted) return;
@@ -87,6 +88,7 @@ export function mountAdmin(app, {admin, config}) {
   route('get', '/admin/api/transactions', async ctx => ({json: {transactions: await admin.transactions({type: ctx.query.type || '', limit: ctx.query.limit})}}));
   route('get', '/admin/api/trades', async ctx => ({json: {trades: await admin.trades({status: ctx.query.status || '', limit: ctx.query.limit})}}));
   route('get', '/admin/api/audit', async ctx => ({json: {audit: await admin.auditLog(ctx.query.limit)}}));
+  route('get', '/admin/api/security', async ctx => ({json: await admin.security({event: ctx.query.event || '', userId: ctx.query.user || '', ip: ctx.query.ip || '', outcome: ctx.query.outcome || '', limit: ctx.query.limit})}));
   route('get', '/admin/api/catalog', async () => ({json: {items: await admin.catalog()}}));
   route('get', '/admin/api/economy', async () => ({json: admin.economySettings()}));
 

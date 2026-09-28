@@ -338,7 +338,83 @@ Qué se compra: **Tablas de Oro** (en USD). Después el jugador las cambia por T
 - Economía: autoridad del servidor, transacciones atómicas, `requestId` idempotente, restricciones `CHECK`/`UNIQUE` en la base de datos y sin coma flotante.
 - Multijugador: con sesión, los demás ven el equipo de la **cuenta** aunque el cliente pida otro. Un invitado solo puede lucir artículos gratuitos. Por WebSocket no viajan saldos, tokens ni datos privados.
 - Cabeceras `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: same-origin` en la API.
-- *Pendiente:* HTTPS en producción (obligatorio para Google fuera de localhost) y cabeceras CSP.
+- Cabeceras de las páginas y archivos del juego (desde el 2026-09-28):
+  - `X-Frame-Options: DENY` y `Content-Security-Policy: frame-ancestors 'none'` (nadie puede incrustar el juego en otra web para engañar con clics sobre "Comprar" o "Aceptar trade");
+  - `nosniff`, `Referrer-Policy: same-origin`, `Permissions-Policy` (sin cámara, micrófono, ubicación ni Payment Request);
+  - `Strict-Transport-Security` si `PUBLIC_URL` es https.
+  - Si algún día quieres incrustar el juego en un portal (p. ej. itch.io), habrá que permitir ese dominio en `frame-ancestors`.
+- **IP real detrás de un proxy:** con `TRUST_PROXY=1` se usa `X-Forwarded-For` / `X-Real-IP`. Sin él, detrás del nginx de aaPanel todos los jugadores llegaban como 127.0.0.1 y compartían el límite de peticiones.
+- **Registro de seguridad de las cuentas:** sección "Auditoría de seguridad" más abajo.
+- *Pendiente:* HTTPS en producción (obligatorio para Google fuera de localhost) y una CSP completa (`script-src`), que exige revisar el CDN de Babylon, las fuentes y los scripts en línea.
+
+## Auditoría de seguridad: login, registro y compras (2026-09-28)
+
+**IMPLEMENTADO · PROBADO** (SQLite y MariaDB, servidor real con proveedor OAuth simulado).
+
+### Revisado y correcto (sin cambios)
+| Área | Qué se comprobó |
+|---|---|
+| Login y registro (OAuth) | `state` de un solo uso ligado a la cookie del navegador (contra CSRF de login y callbacks reutilizados), PKCE y `nonce` en Google, `id_token` validado (firma, `aud`, `iss`, caducidad). La cuenta se identifica por el `sub` del proveedor, nunca por el correo, y no se fusionan cuentas solas. |
+| Sesiones | Token aleatorio de 256 bits (en la base solo su HMAC), cookie `HttpOnly` + `SameSite=Lax` (+ `Secure` con https) de 30 días. Sesión nueva en cada inicio (sin fijación de sesión) y el cierre de sesión la borra. |
+| Peticiones que cambian datos | Sesión + `X-CSRF-Token` + `Origin` del propio sitio; límite por IP y minuto. |
+| Compras y cambio de monedas | Precio leído de la base (se ignora el del cliente), transacción atómica, `requestId` idempotente, saldo que nunca queda negativo (`CHECK`) y movimientos en `wallet_transactions`. |
+| PayPal | Precio del servidor, cobro confirmado con PayPal (nunca por volver a una URL), acreditación una sola vez, webhook con firma verificada y eventos sin duplicar. |
+| Base de datos | Todas las consultas parametrizadas (sin SQL armado con datos del usuario). |
+| XSS | Nicks, códigos, nombres de cuentas vinculadas y datos de salas, trades y resultados se escapan antes de usar `innerHTML`; la tienda usa `textContent`. |
+| Panel /admin | Contraseñas con scrypt, bloqueo tras 5 fallos, cookie limitada a `/admin`, CSRF propio y registro de acciones (`admin_audit`). |
+
+### Encontrado y arreglado
+1. **Detrás de un proxy todos los jugadores tenían la misma IP** (127.0.0.1): el límite de peticiones era común para todos y no había forma de saber desde dónde se entraba. → `TRUST_PROXY=1`.
+2. **No había registro de seguridad de las cuentas.** → Tabla `security_events` (migración 005, SQLite y MySQL): fecha, evento, resultado (`ok`/`fail`), cuenta, IP, navegador y un detalle corto en JSON. **Nunca guarda secretos** (ni códigos OAuth, ni tokens, ni cookies): hay una prueba que lo comprueba.
+
+   | Evento | Cuándo |
+   |---|---|
+   | `auth.register` | Cuenta nueva (primer inicio con Google o Discord) |
+   | `auth.login` (ok / fail) | Inicio de sesión; los fallidos llevan el motivo (`invalid_state`, `invalid_id_token`, `identity_in_use`…) |
+   | `auth.link` · `auth.unlink` · `auth.logout` | Vincular o desvincular un acceso, cerrar sesión |
+   | `account.nickname` | Cambio de nick |
+   | `shop.purchase` (ok / fail) | Compra en la tienda (item, precio o motivo del fallo) |
+   | `coins.exchange` | Cambio de Tablas de Oro por Normales |
+   | `trade.accept` | Trade aceptado |
+   | `payments.checkout` · `payments.credited` · `payments.declined` · `payments.amount_mismatch` · `payments.refund` · `payments.chargeback` · `payments.webhook` | Todo el recorrido de un pago con PayPal, y los webhooks rechazados |
+   | `api.csrf_rejected` | Petición con CSRF u `Origin` inválido (posible ataque) |
+
+   - Se ve en **/admin → 🛡️ Seguridad**:
+     - resumen de 24 h por evento y resultado;
+     - las IPs con más fallos;
+     - lista filtrable por evento, resultado, usuario o IP.
+   - Retención: `SECURITY_LOG_DAYS` (365 por defecto). Se purga al arrancar y cada día.
+   - Escribir el registro nunca rompe la acción del jugador.
+3. **El juego se podía incrustar en otra web** (clickjacking). → Cabeceras de la sección 20.
+4. **Los nombres de los paquetes de Monedas se insertaban sin escapar.** Venían del servidor o del panel, que ya quita `<` y `>`. → Ahora también se escapan en el navegador.
+
+### Recomendaciones pendientes (decisión del dueño)
+- HTTPS obligatorio en producción, y `TRUST_PROXY=1` si hay nginx delante.
+- CSP completa (`script-src`) tras revisar CDN, fuentes y scripts en línea.
+- Si aparece abuso de cuentas nuevas: límite de registros por IP o captcha.
+- Botón "cerrar sesión en todos los dispositivos" y 2FA para el panel /admin.
+- Copias de seguridad automáticas de la base de datos (aaPanel → Cron/Backup).
+- Revisar /admin → Seguridad de vez en cuando: muchos `auth.login` fallidos o `api.csrf_rejected` desde una IP son la señal de un ataque.
+
+## Idiomas: inglés (por defecto) y español (2026-09-28)
+
+**IMPLEMENTADO · PROBADO en Chromium.**
+- El juego abre en **inglés**. Las banderas 🇺🇸 / 🇪🇸 están junto a "MULTIPLAYER · UP TO 8 SURFERS", arriba a la derecha del inicio; en el móvil se ven solo las banderas.
+  - El cambio es instantáneo y se recuerda en el navegador (`localStorage surf.lang`).
+  - También cambia el `lang` del documento.
+- **Cómo está hecho** (`client/src/core/i18n.js` + `i18n-en.js`):
+  - La interfaz sigue escrita en español. Un `MutationObserver` traduce al inglés lo que aparece en pantalla, también lo que el juego escribe después (tienda, salas, trade, HUD, mensajes del servidor).
+  - Traduce el texto y los atributos `placeholder`, `title` y `aria-label`, y guarda el original de cada nodo para volver al español sin recargar.
+  - Las claves de una palabra solo se traducen si son el texto entero, para no tocar nicks como "Kai Olas". Las frases se reemplazan dentro de textos con datos, y `EN_PATTERNS` cubre las que cambian de orden (vueltas, puestos 1st/2nd, "X de Y").
+  - Lo que está dentro de `translate="no"` no se toca.
+  - Los textos dibujados en canvas (cartel SALIDA/META y minimapa) usan `t()`.
+- **Para añadir textos:** escribir en español en el código y añadir su traducción en `client/src/core/i18n-en.js`.
+- No se traducen:
+  - los nombres propios de los mapas (Bahía Coral, Islas del Sol…);
+  - el panel /admin (uso interno, en español);
+  - los nicks de los jugadores.
+- Prueba en el navegador: recorrido por inicio, perfil, tienda (todas las pestañas), ajustes, salas (buscar y crear), trade (todas las pestañas) y carrera buscando textos en español. Solo quedan los nombres de mapas. El cambio de idioma y la persistencia tras recargar se comprobaron también.
+
 
 ## Remasterización del perfil "Mi surfer" (2026-09-27)
 
@@ -741,6 +817,14 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Inglés por defecto con selector de idioma y auditoría de seguridad
+- Idiomas: inglés por defecto, español con la bandera. Traducción de toda la interfaz sin tocar el código de cada pantalla.
+- Auditoría de login, registro y compras:
+  - registro de seguridad en la base de datos (migración 005) y vista en /admin → Seguridad;
+  - IP real detrás de proxy (`TRUST_PROXY`);
+  - cabeceras contra clickjacking;
+  - escapado de los nombres de paquetes.
 
 ### 2026-09-28 · Compra de Tablas de Oro con PayPal y Perfil de tamaño fijo
 - PayPal (Orders v2) en el servidor: checkout con el precio del servidor, cobro confirmado con PayPal al volver, webhook firmado, reembolsos y contracargos. El oro se acredita una sola vez. Todo en USD.

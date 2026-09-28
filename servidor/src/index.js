@@ -19,6 +19,7 @@ import {authConfig, createAuth, SESSION_COOKIE} from './auth.js';
 import {mountApi, parseCookies} from './api.js';
 import {createPayPal, paypalSettings} from './paypal.js';
 import {createPayments} from './payments.js';
+import {createAudit} from './audit.js';
 import {createAdmin} from './admin.js';
 import {mountAdmin} from './admin-api.js';
 
@@ -183,13 +184,24 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
       return res.writeStatus('304 Not Modified').writeHeader('ETag', etag).writeHeader('Cache-Control', cacheControl).end();
     }
     const asset = readFileSync(file);
-    res.writeHeader('Cache-Control', cacheControl).writeHeader('ETag', etag).writeHeader('Content-Type', type);
+    pageHeaders(res).writeHeader('Cache-Control', cacheControl).writeHeader('ETag', etag).writeHeader('Content-Type', type);
     if (pathname === '/sw.js') res.writeHeader('Service-Worker-Allowed', '/');
     res.end(asset);
   } catch {
     res.writeStatus('404 Not Found').end();
   }
 });
+// Cabeceras de seguridad de las páginas y archivos del juego:
+//  - no se puede incrustar en otra web (clickjacking sobre "Comprar" o "Aceptar trade");
+//  - el navegador no adivina tipos (nosniff), no filtra la URL a otros sitios y no pide
+//    cámara, micrófono ni ubicación; con https, HSTS (siempre por https durante un año).
+function pageHeaders(res) {
+  res.writeHeader('X-Frame-Options', 'DENY').writeHeader('Content-Security-Policy', "frame-ancestors 'none'")
+    .writeHeader('X-Content-Type-Options', 'nosniff').writeHeader('Referrer-Policy', 'same-origin')
+    .writeHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  if (authSettings.secure) res.writeHeader('Strict-Transport-Security', 'max-age=31536000');
+  return res;
+}
 function serveUpload(res, name) {
   const file = resolve(uploadsRoot, name), local = relative(uploadsRoot, file);
   const type = {'.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg'}[extname(file)];
@@ -208,7 +220,7 @@ function servePage(res, ifNoneMatch) {
     if (process.env.SURF_HTTP_LOG) console.log('[http]', notModified ? 304 : 200, '/index.html');
     res.cork(() => {
       if (notModified) return res.writeStatus('304 Not Modified').writeHeader('ETag', etag).writeHeader('Cache-Control', 'no-cache').end();
-      res.writeHeader('Cache-Control', 'no-cache').writeHeader('ETag', etag).writeHeader('Content-Type', 'text/html; charset=utf-8').end(html);
+      pageHeaders(res).writeHeader('Cache-Control', 'no-cache').writeHeader('ETag', etag).writeHeader('Content-Type', 'text/html; charset=utf-8').end(html);
     });
   }).catch(e => { console.error('[server] index.html', e); if (!aborted) res.cork(() => res.writeStatus('500 Internal Server Error').end()); });
 }
@@ -250,7 +262,11 @@ setInterval(() => {
 }, 4);
 let lastSnapshot = 0;
 const SNAPSHOT_BACKLOG = 4096;
-const admin = createAdmin(db, {economy, trade, config: economyConfig, uploadsDir: uploadsRoot, secure: authSettings.secure});
+// Registro de seguridad (migración 005): se purga lo más antiguo que SECURITY_LOG_DAYS (365).
+const audit = createAudit(db);
+await audit.purge();
+setInterval(() => audit.purge().catch(() => {}), 24 * 3600_000).unref();
+const admin = createAdmin(db, {economy, trade, config: economyConfig, uploadsDir: uploadsRoot, secure: authSettings.secure, audit});
 // Primer administrador desde .env (ADMIN_USER / ADMIN_PASSWORD) solo si aún no existe ninguno.
 // Lo recomendado es crearlo por consola: npm run admin -- admin-user <usuario> <contraseña>
 if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD && !await admin.countUsers()) {
@@ -260,8 +276,8 @@ if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD && !await admin.countUs
 mountAdmin(app, {admin, config: authSettings});
 // Tablas de Oro con PayPal: activo si servidor/.env tiene PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET.
 const paypal = createPayPal(paypalSettings());
-const payments = createPayments({db, economy, paypal, publicUrl: authSettings.publicUrl});
-mountApi(app, {auth, economy, trade, economyConfig, config: authSettings, onEquipmentChanged: refreshEquipment, payments});
+const payments = createPayments({db, economy, paypal, publicUrl: authSettings.publicUrl, audit});
+mountApi(app, {auth, economy, trade, economyConfig, config: authSettings, onEquipmentChanged: refreshEquipment, payments, audit});
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));

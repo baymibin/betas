@@ -1,5 +1,6 @@
 import {trackFrame, getTrackMap} from '../shared/track.js';
 import {courseSection, RAIL_X, SECTION, LAP_LENGTH} from '../shared/course.js';
+import {t} from '../core/i18n.js';
 
 export function createCourseView(B, scene) {
   function stdMat(name, hex, emit = 0.2, spec = 0.1) {
@@ -161,7 +162,7 @@ export function createCourseView(B, scene) {
   fctx.fillStyle = '#fff9eb';
   fctx.font = 'bold 42px "Baloo 2", sans-serif';
   fctx.textAlign = 'center';
-  fctx.fillText('SALIDA / META', 256, 64);
+  fctx.fillText(t('SALIDA / META'), 256, 64);
   // Chequered strip
   for (let i = 0; i < 32; i++) {
     fctx.fillStyle = i % 2 ? '#e8fff6' : '#08252e';

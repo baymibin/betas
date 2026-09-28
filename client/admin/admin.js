@@ -51,7 +51,7 @@ $('logout').onclick = async () => { try { await api('logout', {}); } catch {} cs
 document.querySelectorAll('#nav [data-view]').forEach(b => b.onclick = () => go(b.dataset.view));
 
 const VIEWS = {dashboard: ['Resumen', dashboard], users: ['Usuarios', usersView], purchases: ['Compras', purchasesView], transactions: ['Movimientos', transactionsView],
-  trades: ['Trades', tradesView], catalog: ['Tienda', catalogView], economy: ['Monedas', economyView], audit: ['Registro de acciones', auditView]};
+  trades: ['Trades', tradesView], catalog: ['Tienda', catalogView], economy: ['Monedas', economyView], audit: ['Registro de acciones', auditView], security: ['Seguridad de las cuentas', securityView]};
 async function go(view) {
   currentView = view;
   document.querySelectorAll('#nav [data-view]').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
@@ -279,6 +279,26 @@ const ACTIONS = {login: 'Entrada', login_failed: 'Intento fallido', grant: 'Ajus
 async function auditView(root) {
   const {audit} = await api('audit?limit=200');
   root.innerHTML = table(['Fecha', 'Administrador', 'Acción', 'Sobre', 'Detalle'], audit.map(a => `<tr><td>${date(a.createdAt)}</td><td>${esc(a.username || '—')}</td><td>${esc(ACTIONS[a.action] || a.action)}</td><td>${esc(a.target || '')}</td><td class="detail">${esc(a.detail || '')}</td></tr>`), 'Sin acciones registradas.');
+}
+
+// ---------- Seguridad de las cuentas (security_events) ----------
+const SEC_EVENTS = {'auth.login': 'Inicio de sesión', 'auth.register': 'Cuenta nueva', 'auth.link': 'Vinculó acceso', 'auth.unlink': 'Desvinculó acceso', 'auth.logout': 'Cerró sesión',
+  'account.nickname': 'Cambió el nick', 'shop.purchase': 'Compra en la tienda', 'coins.exchange': 'Cambio de monedas', 'trade.accept': 'Aceptó trade',
+  'payments.checkout': 'Inició pago PayPal', 'payments.credited': 'Oro acreditado (PayPal)', 'payments.declined': 'Pago denegado', 'payments.amount_mismatch': 'Importe distinto (PayPal)',
+  'payments.refund': 'Reembolso PayPal', 'payments.chargeback': 'Contracargo PayPal', 'payments.webhook': 'Webhook rechazado', 'api.csrf_rejected': 'Petición sin CSRF válido'};
+async function securityView(root, filters = {}) {
+  const q = new URLSearchParams({limit: 200, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v))});
+  const {events, summary} = await api('security?' + q);
+  const sum = summary ? `<section class="panel"><h3>Últimas 24 horas</h3><div class="chips">${summary.events.map(e => `<span class="chip ${e.outcome === 'fail' ? 'bad' : ''}">${esc(SEC_EVENTS[e.event] || e.event)} · ${e.outcome === 'fail' ? 'fallos' : 'ok'}: <b>${e.n}</b></span>`).join('') || '<span class="muted">Sin actividad.</span>'}</div>
+    ${summary.topFailIps.length ? `<p class="muted">IPs con más fallos: ${summary.topFailIps.map(r => `<a href="#" data-ip="${esc(r.ip)}">${esc(r.ip)}</a> (${r.n})`).join(' · ')}</p>` : ''}</section>` : '';
+  root.innerHTML = sum + `<section class="panel"><form id="sec-filter" class="row"><select name="event"><option value="">Todos los eventos</option>${Object.entries(SEC_EVENTS).map(([k, v]) => `<option value="${k}" ${filters.event === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+    <select name="outcome"><option value="">Correctos y fallidos</option><option value="fail" ${filters.outcome === 'fail' ? 'selected' : ''}>Solo fallidos</option><option value="ok" ${filters.outcome === 'ok' ? 'selected' : ''}>Solo correctos</option></select>
+    <input name="user" placeholder="ID de usuario" value="${esc(filters.user || '')}"><input name="ip" placeholder="IP" value="${esc(filters.ip || '')}"><button class="btn small">Filtrar</button></form></section>`
+    + table(['Fecha (UTC)', 'Evento', 'Resultado', 'Usuario', 'IP', 'Detalle', 'Navegador'], events.map(e => `<tr class="${e.outcome === 'fail' ? 'is-fail' : ''}"><td>${date(e.createdAt)}</td><td>${esc(SEC_EVENTS[e.event] || e.event)}</td><td>${e.outcome === 'fail' ? '✗ fallo' : '✓'}</td>
+      <td>${e.userId ? `<a href="#" data-user="${esc(e.userId)}">${esc(e.userId.slice(0, 8))}…</a>` : '—'}</td><td>${esc(e.ip || '—')}</td><td class="detail">${esc(e.detail ? JSON.stringify(e.detail) : '')}</td><td class="detail">${esc((e.userAgent || '').slice(0, 60))}</td></tr>`), 'Sin eventos registrados.');
+  root.querySelector('#sec-filter').onsubmit = ev => { ev.preventDefault(); securityView(root, Object.fromEntries(new FormData(ev.target))); };
+  root.querySelectorAll('[data-ip]').forEach(a => a.onclick = ev => { ev.preventDefault(); securityView(root, {...filters, ip: a.dataset.ip}); });
+  root.querySelectorAll('[data-user]').forEach(a => a.onclick = ev => { ev.preventDefault(); securityView(root, {...filters, user: a.dataset.user}); });
 }
 
 // ---------- Inicio ----------

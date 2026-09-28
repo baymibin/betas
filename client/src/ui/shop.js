@@ -32,6 +32,8 @@ const detailEquip=document.getElementById('shop-detail-equip');
 // Estado del servidor para la tienda: precio, propiedad y saldo. Sin servidor de cuentas todo
 // lo del catálogo actual sigue siendo gratis, como antes (price 0).
 let serverItems=new Map(),busy=false,note='';
+// Los nombres de paquetes vienen del servidor (editables en /admin): se escapan siempre.
+const escapeText=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const coinsIcon=c=>`<img src="${COIN_ICONS[c]}" alt="${COIN_NAMES[c]}">`;
 async function loadCatalog(){
   try{const {items}=await accountApi.catalog();serverItems=new Map(items.map(i=>[i.id,i]));}catch{serverItems=new Map();}
@@ -83,7 +85,7 @@ function coinRow(i,{name,amount,price,button}){
   const [cls,icon,label]=PACK_BADGES[i]||PACK_BADGES[2];
   const row=document.createElement('div');row.className='coin-pack';
   row.innerHTML=`<span class="coin-art"><img src="${PACK_ART[Math.min(i,2)]}" alt=""></span>
-    <div class="coin-text"><strong>${name.toUpperCase()}</strong><em class="coin-badge ${cls}"><i aria-hidden="true">${icon}</i>${label}</em><small>${amount}</small><small class="coin-price">${price}</small></div>`;
+    <div class="coin-text"><strong>${escapeText(name.toUpperCase())}</strong><em class="coin-badge ${cls}"><i aria-hidden="true">${icon}</i>${label}</em><small>${amount}</small><small class="coin-price">${price}</small></div>`;
   row.append(button);return row;
 }
 async function renderCoins(){

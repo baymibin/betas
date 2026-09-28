@@ -10,6 +10,7 @@ import {createEconomy} from '../src/economy.js';
 import {createPayments} from '../src/payments.js';
 import {createPayPal, formatMinor, parseMinor} from '../src/paypal.js';
 import {resetMysql} from './helpers/mysql.js';
+import {createAudit} from '../src/audit.js';
 
 const engines = [['sqlite', ':memory:']];
 if (process.env.TEST_MYSQL_URL) engines.push(['mysql', process.env.TEST_MYSQL_URL]);
@@ -47,11 +48,12 @@ async function setup(url) {
   const eco = createEconomy(db, config);
   await eco.loadCache();
   const paypal = fakePayPal();
-  const pay = createPayments({db, economy: eco, paypal, publicUrl: 'https://surf.example'});
+  const audit = createAudit(db);
+  const pay = createPayments({db, economy: eco, paypal, publicUrl: 'https://surf.example', audit});
   const user = await eco.createUser({nickname: 'Kai'});
   const gold = async () => (await eco.wallet(user)).GOLD_COIN;
   const event = (type, resource, id = 'WH-' + Math.random().toString(36).slice(2)) => JSON.stringify({id, event_type: type, resource});
-  return {db, eco, paypal, pay, user, gold, event};
+  return {db, eco, paypal, pay, user, gold, event, audit};
 }
 const expectCode = (promise, code) => assert.rejects(promise, e => e.code === code, 'se esperaba ' + code);
 
@@ -155,6 +157,19 @@ for (const [engine, url] of engines) {
     assert.equal((await pay.products()).some(p => p.available), false);
     await expectCode(pay.checkout(user, 'gold_small'), 'payments_disabled');
     assert.equal((await pay.webhook({}, '{}')).status, 503);
+  });
+
+  t('payments leave a trail in the security log (credited, mismatch and refund)', async ({pay, user, paypal, audit, event}) => {
+    const {orderId} = await pay.checkout(user, 'gold_small');
+    await pay.completeReturn('PP1');
+    await pay.checkout(user, 'gold_small');
+    paypal.captureResult = () => ({status: 'COMPLETED', amount: {currency_code: 'USD', value: '0.01'}});
+    await pay.completeReturn('PP2');
+    await pay.webhook({}, event('PAYMENT.CAPTURE.REFUNDED', {id: 'R1', custom_id: orderId}));
+    const log = await audit.list();
+    assert.deepEqual(log.map(e => [e.event, e.outcome]).reverse(), [['payments.credited', 'ok'], ['payments.amount_mismatch', 'fail'], ['payments.refund', 'ok']]);
+    assert.ok(log.every(e => e.userId === user));
+    assert.equal(log.at(-1).detail.gold, 100);
   });
 
   t('an open-order limit stops a user from spamming checkouts', async ({pay, user}) => {

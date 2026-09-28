@@ -1,4 +1,5 @@
 import './catalog-remote.js';   // items subidos desde el panel, antes de crear avatares
+import {t} from './i18n.js';   // textos dibujados en canvas (el resto del DOM lo traduce i18n.js solo)
 import {tropicalWaterFragment,createTropicalSky} from '../world/tropical-shaders.js';
 import {createPowerWorld,stepPowerWorld} from '../shared/powerups.js';
 import {botLooks,createBotPlayer,createBrain,botInput} from '../shared/bot-ai.js';
@@ -31,7 +32,7 @@ function fatal(msg){
   fatalEl.innerHTML = '<div><b>No se pudo iniciar el juego</b><br><br>' + msg + '</div>';
   const l = document.getElementById('loading'); if(l) l.classList.add('gone');
 }
-if(!window.BABYLON){ fatal('No se pudo cargar Babylon.js desde el CDN.<br>Comprueba tu conexiÃ³n a internet y recarga la pÃ¡gina.'); return; }
+if(!window.BABYLON){ fatal('No se pudo cargar Babylon.js desde el CDN.<br>Comprueba tu conexión a internet y recarga la página.'); return; }
 
 // ?hq fija la calidad mÃ¡xima y desactiva el ajuste automÃ¡tico (Ãºtil para capturas)
 const PARAMS = new URLSearchParams(window.location.search);
@@ -1947,7 +1948,7 @@ function checkCollisions(){
           o.boosted = true;
           boostValue = Math.min(1, boostValue + 0.5);
           points += 50;
-          showTrick('Â¡ARO! +50');
+          showTrick('¡ARO! +50');
           shake = Math.max(shake, 0.14);
         }
       } else if(o.kind === 'jump'){
@@ -1971,7 +1972,7 @@ function checkCollisions(){
       pearlCount++;
       coinsEl.textContent = pearlCount;
       boostValue = Math.min(1, boostValue + 0.10);
-      if(pearlCount % 12 === 0){ points += 25; showTrick('Â¡COMBO! +25'); }
+      if(pearlCount % 12 === 0){ points += 25; showTrick('¡COMBO! +25'); }
     }
   }
 }
@@ -2006,7 +2007,7 @@ function drawMinimap(){
  const dot=(z,color,size)=>{const p=point(raceProgress(z).fraction);c.beginPath();c.arc(p.x,p.y,size,0,TAU);c.fillStyle=color;c.fill();c.strokeStyle='#fff';c.lineWidth=2;c.stroke();};
  for(const r of online?(net.remote.at(-1)?.players||[]):practiceBots.map(b=>b.player))dot(r.z,r.bot?'#5ce8f0':'#ff8264',4);
  dot(-distance,'#ffdf61',7);
- const race=raceProgress(-distance);c.fillStyle='#fff';c.font='bold 19px sans-serif';c.textAlign='center';c.fillText(race.finished?'META':`VUELTA ${race.lap} / 3`,w/2,h-13);
+ const race=raceProgress(-distance);c.fillStyle='#fff';c.font='bold 19px sans-serif';c.textAlign='center';c.fillText(t(race.finished?'META':`VUELTA ${race.lap} / 3`),w/2,h-13);
  if(running&&race.finished&&(!online||net.authoritative?.place>0)){showTrick('3 VUELTAS COMPLETADAS');endGame();}
 }
 

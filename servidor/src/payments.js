@@ -20,7 +20,8 @@ import {formatMinor, parseMinor, PayPalError} from './paypal.js';
 const OPEN_ORDER_LIMIT = 5;   // órdenes sin terminar por cuenta en la última hora
 const num = v => typeof v === 'bigint' ? Number(v) : Number(v ?? 0);
 
-export function createPayments({db, economy, paypal, publicUrl}) {
+export function createPayments({db, economy, paypal, publicUrl, audit = null}) {
+  const note = (event, ok, order, detail = {}) => audit?.log({event, ok, userId: order?.user_id || null, detail: {orderId: order?.id, ...detail}});
   const base = String(publicUrl || '').replace(/\/$/, '');
 
   async function products() {
@@ -72,6 +73,7 @@ export function createPayments({db, economy, paypal, publicUrl}) {
       const amount = capture.amount || {};
       if (amount.currency_code !== order.currency || parseMinor(amount.value) !== order.amount_minor) {
         console.error('[payments] importe de PayPal distinto al de la orden', order.id, amount);
+        note('payments.amount_mismatch', false, order, {expected: order.amount_minor, currency: order.currency, paid: amount.value, paidCurrency: amount.currency_code});
         return 'AMOUNT_MISMATCH';
       }
       await db.tx(async t => {
@@ -79,7 +81,10 @@ export function createPayments({db, economy, paypal, publicUrl}) {
         if (row && ['CREATED', 'PENDING'].includes(row.status)) await setStatus(t, row.id, 'PAID');
       });
       const current = await orderRow('id = ?', [order.id]);
-      if (current.status === 'PAID') await economy.creditPaidOrder(order.id);
+      if (current.status === 'PAID') {
+        const r = await economy.creditPaidOrder(order.id);
+        if (r.credited) note('payments.credited', true, order, {gold: order.gold_amount, amountMinor: order.amount_minor, currency: order.currency, captureId: capture.id});
+      }
       return (await orderRow('id = ?', [order.id])).status;
     }
     if (status === 'DECLINED' || status === 'FAILED') {
@@ -87,6 +92,7 @@ export function createPayments({db, economy, paypal, publicUrl}) {
         const row = await orderRow('id = ?', [order.id], t);
         if (row && ['CREATED', 'PENDING'].includes(row.status)) await setStatus(t, row.id, 'FAILED');
       });
+      note('payments.declined', false, order, {status});
       return 'FAILED';
     }
     return order.status;   // PENDING (p. ej. revisión de PayPal): lo terminará el webhook
@@ -140,7 +146,8 @@ export function createPayments({db, economy, paypal, publicUrl}) {
         catch (e) { if (e.code !== 'duplicate_operation') throw e; }
       }
       if (take < order.gold_amount) console.warn('[payments] reembolso con oro ya gastado', order.id, 'retirado', take, 'de', order.gold_amount);
-    }
+      note(status === 'CHARGEBACK' ? 'payments.chargeback' : 'payments.refund', true, order, {gold: order.gold_amount, goldTaken: take});
+    } else note(status === 'CHARGEBACK' ? 'payments.chargeback' : 'payments.refund', true, order, {goldTaken: 0});
     return status;
   }
 
