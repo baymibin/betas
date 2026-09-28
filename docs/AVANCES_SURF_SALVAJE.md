@@ -511,6 +511,9 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
   - **Causa encontrada con las capturas del jugador:** la ventana del juego **pierde el foco** en plena carrera (`blur 2`, luego `blur 5`, con A/D pulsada). Desde ese momento el navegador ya no manda las teclas al juego y el surfista se para. No es un fallo de la simulación.
   - Qué le quita el foco está fuera del juego. Sospecha principal: el aviso de Windows de "Teclas especiales" / "Teclas filtro", que salta al pulsar Mayús (turbo) 5 veces seguidas o al mantenerla 8 s. También puede ser un overlay (Xbox Game Bar, Discord, NVIDIA).
   - Aviso nuevo: "El juego perdió el foco…" en el centro de la pantalla hasta hacer clic. El diagnóstico muestra la última tecla antes del blur (`blur tras Shift`).
+  - **Cambio posterior (`controles-5`):** un `blur` ya no suelta A/D al momento. Solo se sueltan las teclas si 400 ms después `document.hasFocus()` sigue siendo falso. Si el blur era falso o el foco vuelve enseguida, el giro sigue como estaba.
+    - La segunda captura del jugador mostraba `rep 0` y unos 20 pares keydown/keyup por segundo: su sistema manda la repetición de teclas como pares. Con eso, cada blur dejaba la tecla soltada.
+    - El diagnóstico muestra ahora `focus` y `foco SÍ/NO`.
   - **PENDIENTE:** confirmar con el jugador qué ventana aparece. Si es el atajo de Windows, desactivarlo en Configuración → Accesibilidad → Teclado, o decidir otra tecla de turbo.
 - **Salas:**
   - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
@@ -669,6 +672,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Un blur ya no suelta A/D si el juego conserva el foco
+- Las teclas solo se sueltan si el foco sigue fuera 400 ms después. Probado: con un blur falso, D sigue moviendo al surfista; con una pérdida real de foco, se sueltan las teclas y sale el aviso.
 
 ### 2026-09-28 · Frenazo al mantener A/D: la ventana pierde el foco
 - Las capturas con `?debug` muestran `blur` en plena carrera: otra ventana se pone delante y las teclas dejan de llegar. Aviso en pantalla "El juego perdió el foco… haz clic" y registro de la última tecla antes del blur.
