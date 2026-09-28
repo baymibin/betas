@@ -30,7 +30,7 @@ export const contentHash = (fromUser, toUser, offer, request) =>
   createHash('sha256').update(JSON.stringify([fromUser, toUser, [...offer].sort(), [...request].sort()])).digest('hex');
 
 export function createTrade(db, economy, config = {}) {
-  const settings = () => ({enabled: true, maxItemsPerSide: 4, maxOpenOffers: 10, offerTTLHours: 72, minAccountAgeHours: 24, dailyTradeLimit: 20, ...(config.trade || {})});
+  const settings = () => ({enabled: true, maxItemsPerSide: 4, maxOpenOffers: 10, maxOpenListings: 5, listingTTLHours: 168, offerTTLHours: 72, minAccountAgeHours: 24, dailyTradeLimit: 20, ...(config.trade || {})});
   const fail = (code, status = 409, detail) => { throw new EconomyError(code, status, detail); };
 
   // ---------- Código de surfista ----------
@@ -114,8 +114,8 @@ export function createTrade(db, economy, config = {}) {
     return ids;
   }
 
-  // ---------- Crear oferta (o contraoferta con parentId) ----------
-  async function create(fromUser, {toCode, offer, request, requestId, parentId = null} = {}) {
+  // ---------- Crear oferta (contraoferta con parentId; negociación de una publicación con listingId) ----------
+  async function create(fromUser, {toCode, offer, request, requestId, parentId = null, listingId = null} = {}) {
     if (!REQUEST_ID.test(String(requestId || ''))) fail('invalid_request_id', 400);
     const s = settings();
     const give = cleanList(offer), get = cleanList(request);
@@ -123,7 +123,12 @@ export function createTrade(db, economy, config = {}) {
     if (give.some(id => get.includes(id))) fail('invalid_items', 400);
     await requireEligible(fromUser);
     let target;
-    if (parentId) {
+    if (listingId) {
+      const listing = await db.get('SELECT user_id, status, expires_at FROM trade_listings WHERE id = ?', [String(listingId)]);
+      if (!listing) fail('listing_not_found', 404);
+      if (listing.status !== 'OPEN' || num(listing.expires_at) < Date.now()) fail('listing_closed', 409);
+      target = listing.user_id;
+    } else if (parentId) {
       const parent = await db.get('SELECT id, from_user, to_user, status FROM trade_offers WHERE id = ?', [String(parentId)]);
       if (!parent || parent.to_user !== fromUser) fail('offer_not_found', 404);
       if (parent.status !== 'OPEN') fail('offer_closed', 409, {status: parent.status});
@@ -151,11 +156,13 @@ export function createTrade(db, economy, config = {}) {
           if (parent?.status !== 'OPEN') fail('offer_closed', 409, {status: parent?.status});
           await t.run("UPDATE trade_offers SET status = 'COUNTERED', updated_at = ? WHERE id = ?", [nowSql(), parentId]);
         }
+        if (listingId && (await t.get('SELECT status FROM trade_listings WHERE id = ?' + t.forUpdate, [listingId]))?.status !== 'OPEN') fail('listing_closed', 409);
         const id = randomUUID(), now = nowSql();
         await t.run(`INSERT INTO trade_offers (id, from_user, to_user, status, parent_id, content_hash, request_id, expires_at, created_at, updated_at)
           VALUES (?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?)`, [id, fromUser, target, parentId, hash, requestId, Date.now() + s.offerTTLHours * 3600_000, now, now]);
         for (const item of give) await t.run("INSERT INTO trade_offer_items (offer_id, side, item_id) VALUES (?, 'OFFER', ?)", [id, item]);
         for (const item of get) await t.run("INSERT INTO trade_offer_items (offer_id, side, item_id) VALUES (?, 'REQUEST', ?)", [id, item]);
+        if (listingId) await t.run('INSERT INTO trade_listing_offers (offer_id, listing_id) VALUES (?, ?)', [id, listingId]);
         return {offerId: id, contentHash: hash, replayed: false};
       });
     } catch (error) {
@@ -217,6 +224,11 @@ export function createTrade(db, economy, config = {}) {
           AND (from_user IN (?, ?) OR to_user IN (?, ?))
           AND id IN (SELECT offer_id FROM trade_offer_items WHERE item_id IN (${moved.map(() => '?').join(', ')}))`,
         [now, offerId, offer.from_user, offer.to_user, offer.from_user, offer.to_user, ...moved]);
+      // La publicación de la que salió el trade se cierra; las que ofrecían items entregados ya no valen.
+      await t.run(`UPDATE trade_listings SET status = 'COMPLETED', updated_at = ? WHERE status = 'OPEN' AND id IN (SELECT listing_id FROM trade_listing_offers WHERE offer_id = ?)`, [now, offerId]);
+      await t.run(`UPDATE trade_listings SET status = 'INVALID', updated_at = ? WHERE status = 'OPEN' AND user_id IN (?, ?)
+          AND id IN (SELECT listing_id FROM trade_listing_items WHERE side = 'OFFER' AND item_id IN (${moved.map(() => '?').join(', ')}))`,
+        [now, offer.from_user, offer.to_user, ...moved]);
       return {completed: true, replayed: false, offerId, received: items.give, given: items.get, users: [offer.from_user, offer.to_user]};
     });
     if (result.error) fail(result.error, 409, result.detail);
@@ -247,15 +259,15 @@ export function createTrade(db, economy, config = {}) {
     }[box] || fail('invalid_box', 400);
     const params = box === 'history' ? [userId, userId] : [userId];
     const rows = await db.all(`SELECT o.id, o.from_user, o.to_user, o.status, o.parent_id AS parentId, o.content_hash AS contentHash, o.expires_at AS expiresAt,
-        o.created_at AS createdAt, o.updated_at AS updatedAt, o.completed_at AS completedAt
-      FROM trade_offers o WHERE ${where} ORDER BY o.updated_at DESC, o.created_at DESC LIMIT 40`, params);
+        o.created_at AS createdAt, o.updated_at AS updatedAt, o.completed_at AS completedAt, lo.listing_id AS listingId
+      FROM trade_offers o LEFT JOIN trade_listing_offers lo ON lo.offer_id = o.id WHERE ${where} ORDER BY o.updated_at DESC, o.created_at DESC LIMIT 40`, params);
     const out = [];
     for (const row of rows) {
       const mine = row.from_user === userId, other = mine ? row.to_user : row.from_user;
       const who = await db.get(`SELECT u.nickname, u.avatar_url AS avatarUrl, p.public_code AS code FROM users u LEFT JOIN trade_profiles p ON p.user_id = u.id WHERE u.id = ?`, [other]);
       const items = await offerItems(row.id);
       out.push({
-        id: row.id, status: row.status, direction: mine ? 'sent' : 'received', parentId: row.parentId || null,
+        id: row.id, status: row.status, direction: mine ? 'sent' : 'received', parentId: row.parentId || null, listingId: row.listingId || null,
         partner: who || {nickname: 'Surfer', avatarUrl: null, code: null},
         give: mine ? items.give : items.get, get: mine ? items.get : items.give,
         contentHash: row.contentHash, expiresAt: num(row.expiresAt), createdAt: row.createdAt, updatedAt: row.updatedAt, completedAt: row.completedAt || null
@@ -267,8 +279,100 @@ export function createTrade(db, economy, config = {}) {
     await expireOld();
     const s = settings(), e = await eligibility(userId);
     const received = num((await db.get("SELECT COUNT(*) AS n FROM trade_offers WHERE to_user = ? AND status = 'OPEN'", [userId])).n);
-    return {code: await code(userId), received, eligible: e.ok, reason: e.ok ? null : e.reason, readyAt: e.readyAt || null,
-      limits: {maxItemsPerSide: s.maxItemsPerSide, maxOpenOffers: s.maxOpenOffers, offerTTLHours: s.offerTTLHours, dailyTradeLimit: s.dailyTradeLimit}};
+    await expireListings();
+    const publicCount = num((await db.get("SELECT COUNT(*) AS n FROM trade_listings WHERE status = 'OPEN' AND user_id <> ?", [userId])).n);
+    return {code: await code(userId), received, publicCount, eligible: e.ok, reason: e.ok ? null : e.reason, readyAt: e.readyAt || null,
+      limits: {maxItemsPerSide: s.maxItemsPerSide, maxOpenOffers: s.maxOpenOffers, maxOpenListings: s.maxOpenListings, offerTTLHours: s.offerTTLHours, listingTTLHours: s.listingTTLHours, dailyTradeLimit: s.dailyTradeLimit}};
+  }
+
+  // ---------- Trades públicos (tablón) ----------
+  // Una publicación dice "ofrezco estos items (y busco estos otros)". No mueve nada por sí sola:
+  // quien la ve negocia enviando una oferta normal al dueño (create con listingId).
+  const expireListings = () => db.run("UPDATE trade_listings SET status = 'EXPIRED', updated_at = ? WHERE status = 'OPEN' AND expires_at < ?", [nowSql(), Date.now()]);
+  async function listingItems(ids, r = db) {
+    const out = new Map(ids.map(id => [id, {give: [], want: []}]));
+    if (!ids.length) return out;
+    for (const row of await r.all(`SELECT listing_id, side, item_id FROM trade_listing_items WHERE listing_id IN (${ids.map(() => '?').join(', ')}) ORDER BY item_id`, ids)) {
+      out.get(row.listing_id)[row.side === 'OFFER' ? 'give' : 'want'].push(row.item_id);
+    }
+    return out;
+  }
+  async function publish(userId, {offer, want = [], requestId} = {}) {
+    if (!REQUEST_ID.test(String(requestId || ''))) fail('invalid_request_id', 400);
+    const s = settings();
+    const give = cleanList(offer), wanted = cleanList(want);
+    if (!give.length || give.length > s.maxItemsPerSide || wanted.length > s.maxItemsPerSide || give.some(id => wanted.includes(id))) fail('invalid_items', 400, {max: s.maxItemsPerSide});
+    await requireEligible(userId);
+    await code(userId);
+    await expireListings();
+    const hash = createHash('sha256').update(JSON.stringify([userId, [...give].sort(), [...wanted].sort()])).digest('hex');
+    try {
+      return await db.tx(async t => {
+        await economy.lockWallet(t, userId, NORMAL);
+        const previous = await t.get('SELECT id, content_hash FROM trade_listings WHERE user_id = ? AND request_id = ?', [userId, requestId]);
+        if (previous) {
+          if (previous.content_hash !== hash) fail('request_id_reused', 409);
+          return {listingId: previous.id, replayed: true};
+        }
+        if (num((await t.get("SELECT COUNT(*) AS n FROM trade_listings WHERE user_id = ? AND status = 'OPEN'", [userId])).n) >= s.maxOpenListings) fail('too_many_listings', 429, {max: s.maxOpenListings});
+        if (await t.get("SELECT 1 AS ok FROM trade_listings WHERE user_id = ? AND content_hash = ? AND status = 'OPEN'", [userId, hash])) fail('listing_exists', 409);
+        for (const id of give) {
+          const item = await economy.itemRow(id, t);
+          if (!item || !item.available || !economy.tradeable(id, item.price)) fail('item_not_tradeable', 409, {itemId: id});
+          if (!await economy.owns(userId, id, t)) fail('not_owned', 409, {itemId: id, side: 'you'});
+        }
+        for (const id of wanted) {
+          const item = await economy.itemRow(id, t);
+          if (!item || !item.available || !economy.tradeable(id, item.price)) fail('item_not_tradeable', 409, {itemId: id});
+          if (await economy.owns(userId, id, t)) fail('already_owned', 409, {itemId: id, side: 'you'});
+        }
+        const id = randomUUID(), now = nowSql();
+        await t.run(`INSERT INTO trade_listings (id, user_id, status, request_id, content_hash, expires_at, created_at, updated_at) VALUES (?, ?, 'OPEN', ?, ?, ?, ?, ?)`,
+          [id, userId, requestId, hash, Date.now() + s.listingTTLHours * 3600_000, now, now]);
+        for (const item of give) await t.run("INSERT INTO trade_listing_items (listing_id, side, item_id) VALUES (?, 'OFFER', ?)", [id, item]);
+        for (const item of wanted) await t.run("INSERT INTO trade_listing_items (listing_id, side, item_id) VALUES (?, 'WANT', ?)", [id, item]);
+        return {listingId: id, replayed: false};
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        const previous = await db.get('SELECT id, content_hash FROM trade_listings WHERE user_id = ? AND request_id = ?', [userId, requestId]);
+        if (previous?.content_hash === hash) return {listingId: previous.id, replayed: true};
+      }
+      throw error;
+    }
+  }
+  // Tablón: las publicaciones abiertas de los demás (o las propias con mine). Las que ofrecen algo
+  // que su dueño ya no tiene se cierran aquí mismo como INVALID.
+  async function listings(viewerId, {mine = false} = {}) {
+    await expireListings();
+    const rows = await db.all(`SELECT l.id, l.user_id, l.created_at AS createdAt, l.expires_at AS expiresAt, u.nickname, u.avatar_url AS avatarUrl, p.public_code AS code,
+        (SELECT COUNT(*) FROM trade_listing_offers lo JOIN trade_offers o ON o.id = lo.offer_id WHERE lo.listing_id = l.id AND o.status = 'OPEN') AS offers
+      FROM trade_listings l JOIN users u ON u.id = l.user_id LEFT JOIN trade_profiles p ON p.user_id = l.user_id
+      WHERE l.status = 'OPEN' AND ${mine ? 'l.user_id = ?' : `l.user_id <> ? AND NOT EXISTS (SELECT 1 FROM trade_blocks b WHERE (b.user_id = l.user_id AND b.blocked_user_id = ?) OR (b.user_id = ? AND b.blocked_user_id = l.user_id))`}
+      ORDER BY l.created_at DESC LIMIT 60`, mine ? [viewerId] : [viewerId, viewerId, viewerId]);
+    const items = await listingItems(rows.map(r => r.id));
+    const mineOwned = new Set((await db.all('SELECT item_id FROM user_inventory_v2 WHERE user_id = ?', [viewerId])).map(r => r.item_id));
+    const out = [];
+    for (const row of rows) {
+      const {give, want} = items.get(row.id);
+      const owned = new Set((await db.all(`SELECT item_id FROM user_inventory_v2 WHERE user_id = ? AND item_id IN (${give.map(() => '?').join(', ') || "''"})`, [row.user_id, ...give])).map(r => r.item_id));
+      if (give.some(id => !owned.has(id))) {
+        await db.run("UPDATE trade_listings SET status = 'INVALID', updated_at = ? WHERE id = ? AND status = 'OPEN'", [nowSql(), row.id]);
+        continue;
+      }
+      out.push({id: row.id, mine: row.user_id === viewerId, owner: {nickname: row.nickname, avatarUrl: row.avatarUrl, code: row.code}, give, want,
+        offers: num(row.offers), createdAt: row.createdAt, expiresAt: num(row.expiresAt),
+        // ¿Tiene quien mira todo lo que se busca (y nada de lo que se ofrece)? Solo es una pista para la interfaz.
+        youHaveWanted: !!want.length && want.every(id => mineOwned.has(id)), youOwnSome: give.some(id => mineOwned.has(id))});
+    }
+    return out;
+  }
+  async function withdrawListing(userId, listingId) {
+    const listing = await db.get('SELECT id, user_id, status FROM trade_listings WHERE id = ?', [String(listingId || '')]);
+    if (!listing || listing.user_id !== userId) fail('listing_not_found', 404);
+    if (listing.status !== 'OPEN') fail('listing_closed', 409, {status: listing.status});
+    await db.run("UPDATE trade_listings SET status = 'CANCELED', updated_at = ? WHERE id = ? AND status = 'OPEN'", [nowSql(), listing.id]);
+    return {listingId: listing.id, status: 'CANCELED'};
   }
 
   // ---------- Bloqueos ----------
@@ -310,5 +414,5 @@ export function createTrade(db, economy, config = {}) {
     });
   }
 
-  return {code, normalizeCode, eligibility, inventory, partner, create, accept, decline, cancel, list, summary, block, unblock, blocked, adminTrades, adminRevert};
+  return {code, normalizeCode, eligibility, inventory, partner, create, publish, listings, withdrawListing, accept, decline, cancel, list, summary, block, unblock, blocked, adminTrades, adminRevert};
 }

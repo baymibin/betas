@@ -157,3 +157,52 @@ for (const [engine, url] of engines) {
     await expectCode(tr.adminRevert(offer.offerId), 'offer_not_completed');
   });
 }
+
+for (const [engine, url] of engines) {
+  const t = (name, fn, opts) => test(`[${engine}] trade público: ${name}`, async () => { const ctx = await setup(url, opts); try { await fn(ctx); } finally { await ctx.db.close(); } });
+
+  t('a listing shows up for others, not for its owner, and is validated', async ({tr, a, b, give}) => {
+    await give(a, 'wing:5', 'board:2');
+    await expectCode(tr.publish(a, {offer: ['wing:1'], requestId: rid()}), 'not_owned');
+    await expectCode(tr.publish(a, {offer: ['wing:0'], requestId: rid()}), 'item_not_tradeable');
+    await expectCode(tr.publish(a, {offer: ['wing:5'], want: ['board:2'], requestId: rid()}), 'already_owned');
+    await expectCode(tr.publish(a, {offer: [], requestId: rid()}), 'invalid_items');
+    const same = rid();
+    const {listingId} = await tr.publish(a, {offer: ['wing:5'], want: ['board:3'], requestId: same});
+    assert.equal((await tr.publish(a, {offer: ['wing:5'], want: ['board:3'], requestId: same})).replayed, true);
+    await expectCode(tr.publish(a, {offer: ['wing:5'], want: ['board:3'], requestId: rid()}), 'listing_exists');
+    const seen = await tr.listings(b);
+    assert.deepEqual([seen.length, seen[0].id, seen[0].give, seen[0].want, seen[0].mine], [1, listingId, ['wing:5'], ['board:3'], false]);
+    assert.equal((await tr.listings(a)).length, 0, 'el dueño no ve la suya en el tablón');
+    assert.equal((await tr.listings(a, {mine: true})).length, 1);
+    assert.equal((await tr.summary(b)).publicCount, 1);
+    await expectCode(tr.withdrawListing(b, listingId), 'listing_not_found');
+    await tr.withdrawListing(a, listingId);
+    assert.equal((await tr.listings(b)).length, 0);
+  });
+
+  t('negotiating a listing: the owner accepts and the listing closes', async ({eco, tr, a, b, c, give}) => {
+    await give(a, 'wing:5', 'wing:6'); await give(b, 'board:3'); await give(c, 'board:4');
+    const {listingId} = await tr.publish(a, {offer: ['wing:5'], want: ['board:3'], requestId: rid()});
+    const other = await tr.publish(a, {offer: ['wing:5', 'wing:6'], requestId: rid()});
+    await expectCode(tr.create(a, {listingId, offer: ['wing:6'], request: ['board:3'], requestId: rid()}), 'trade_self');
+    const fromB = await tr.create(b, {listingId, offer: ['board:3'], request: ['wing:5'], requestId: rid()});
+    const fromC = await tr.create(c, {listingId: other.listingId, offer: ['board:4'], request: ['wing:6'], requestId: rid()});
+    const received = await tr.list(a, 'received');
+    assert.equal(received.find(o => o.id === fromB.offerId).listingId, listingId);
+    assert.equal((await tr.listings(a, {mine: true})).find(l => l.id === listingId).offers, 1);
+    await tr.accept(a, fromB.offerId, fromB.contentHash);
+    assert.deepEqual(await owned(eco, b), ['wing:5']);
+    // La publicación negociada se cierra y la otra (que también ofrecía wing:5) deja de valer.
+    assert.equal((await tr.listings(c)).length, 0);
+    await expectCode(tr.create(c, {listingId, offer: ['board:4'], request: ['wing:5'], requestId: rid()}), 'listing_closed');
+    assert.ok(await tr.accept(a, fromC.offerId, fromC.contentHash), 'la oferta de C sobre wing:6 sigue siendo válida');
+  });
+
+  t('listings of blocked surfers are hidden', async ({tr, a, b, code, give}) => {
+    await give(a, 'wing:5');
+    await tr.publish(a, {offer: ['wing:5'], requestId: rid()});
+    await tr.block(b, code.a);
+    assert.equal((await tr.listings(b)).length, 0);
+  });
+}

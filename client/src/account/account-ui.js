@@ -1,7 +1,7 @@
 // Menú principal (panel de acceso) y Perfil de la cuenta.
 // Botones reales: "Continuar con Google" y "Continuar con Discord" abren el flujo oficial del
 // proveedor a través del servidor. Sin sesión se sigue jugando como invitado.
-import {account, refresh, login, logout, setNickname, consumeAuthRedirect, message, formatCoins, providerName, DEFAULT_AVATAR} from './account.js';
+import {account, refresh, login, logout, setNickname, consumeAuthRedirect, message, providerName} from './account.js';
 import './profile-ui.js';
 import './trade-ui.js';
 
@@ -15,11 +15,12 @@ function say(text, error = false) {
 }
 
 // ---------- Panel del menú ----------
+// En la caja de JUGAR solo quedan "Jugar en solitario" y, con sesión, "Cerrar sesión". Los botones
+// de Google y Discord viven abajo a la izquierda y solo se ven sin sesión.
 function renderHome() {
   const signed = account.authenticated;
   $('auth-guest').hidden = signed;
-  $('auth-user').hidden = !signed;
-  $('auth-divider').querySelector('span').textContent = signed ? 'TU CUENTA' : 'O CONTINÚA CON';
+  $('auth-logout').hidden = !signed;
   // Los botones mantienen su aspecto; si el servidor aún no tiene credenciales de ese
   // proveedor, al pulsar se explica en vez de abrir un login que no puede funcionar.
   for (const provider of ['google', 'discord']) {
@@ -27,12 +28,9 @@ function renderHome() {
     $('login-' + provider).classList.toggle('is-unconfigured', off);
     $('login-' + provider).setAttribute('aria-disabled', String(off));
   }
-  if (!signed) return;
-  $('auth-avatar').src = account.user.avatarUrl || DEFAULT_AVATAR;
-  $('auth-name').textContent = account.user.nickname;
-  $('auth-via').textContent = 'Con ' + account.identities.map(i => providerName(i.provider)).join(' y ');
-  $('auth-normal').textContent = formatCoins(account.wallet.NORMAL_COIN);
-  $('auth-gold').textContent = formatCoins(account.wallet.GOLD_COIN);
+  const discord = $('home-discord');
+  discord.href = account.links?.discord || '#';
+  discord.classList.toggle('is-unconfigured', !account.links?.discord);
 }
 
 for (const provider of ['google', 'discord']) $('login-' + provider).onclick = () => {
@@ -41,7 +39,8 @@ for (const provider of ['google', 'discord']) $('login-' + provider).onclick = (
   login(provider);
 };
 $('auth-logout').onclick = async () => { await logout(); say('Sesión cerrada. Sigues pudiendo jugar como invitado.'); };
-$('auth-open-profile').onclick = () => $('home-profile').click();
+// Comunidad de Discord: el enlace lo da el servidor (DISCORD_INVITE_URL en servidor/.env).
+$('home-discord').onclick = e => { if (!account.links?.discord) { e.preventDefault(); say('El enlace de la comunidad de Discord todavía no está configurado en el servidor.', true); } };
 
 // Con sesión, el nick es el de la cuenta: se guarda en el servidor al terminar de escribir.
 const nickInput = $('nickname');

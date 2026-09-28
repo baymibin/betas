@@ -90,7 +90,8 @@ docs/AVANCES_SURF_SALVAJE.md este documento
 | `GET /api/payments/products` · `POST /api/payments/checkout` | Productos de oro / pago (deshabilitado: 503) | — / sí | sí |
 | `POST /api/payments/webhook/:provider` | Reservado para el proveedor de pagos (501) | — | firma (pendiente) |
 | `GET /api/trade/summary` · `/inventory` · `/user?code=` · `/offers?box=received\|sent\|history` · `/blocked` | Trade: código propio y ofertas pendientes, items intercambiables, buscar surfista, listados, bloqueados | sí | — |
-| `POST /api/trade/offers` · `/accept` · `/decline` · `/cancel` · `/block` · `/unblock` | Trade: crear (o contraofertar), aceptar, rechazar, cancelar, bloquear | sí | sí |
+| `POST /api/trade/offers` · `/accept` · `/decline` · `/cancel` · `/block` · `/unblock` | Trade: crear (o contraofertar, o negociar una publicación con `listingId`), aceptar, rechazar, cancelar, bloquear | sí | sí |
+| `GET /api/trade/listings[?mine=1]` · `POST /api/trade/listings` · `POST /api/trade/listings/withdraw` | Trades públicos: tablón, publicar, retirar | sí | POST: sí |
 
 ## 6. Base de datos
 
@@ -144,6 +145,8 @@ Todas las cantidades son **INTEGER**; nunca coma flotante.
 - **Regla:** no editar una migración ya aplicada. Para cambiar el esquema se crea `002_...sql` **en las dos carpetas**. Prohibido `DROP TABLE` sobre datos reales.
 - En MySQL el DDL no es transaccional: las migraciones usan `CREATE TABLE IF NOT EXISTS` para poder relanzarse si algo se corta.
 - `002_trade.sql` (Trade): crea `user_inventory_v2` e `item_purchases_v2` **copiando** los datos de `user_inventory` e `item_purchases`, que quedan como histórico (no se borran ni se modifican). Hacía falta porque la tabla anterior no admitía el origen `TRADE` (su `CHECK` no se puede cambiar en SQLite sin reconstruirla) y `item_purchases` impedía volver a comprar un item entregado en un trade (`UNIQUE (user_id, item_id)`). Añade `trade_profiles` (código de surfista), `trade_offers`, `trade_offer_items`, `item_transfers` (libro de movimientos de items) y `trade_blocks`. Sin `ALTER TABLE`: se puede relanzar en MySQL.
+- `003_trade_listings.sql` (Trades públicos): `trade_listings`, `trade_listing_items` (OFFER = lo que se publica, WANT = lo que se busca) y `trade_listing_offers` (qué ofertas nacen de cada publicación). Solo tablas nuevas.
+- **Las dos tablas `user_inventory` y `user_inventory_v2` conviviendo es normal:** la antigua queda como copia de antes del Trade y ya no se usa. No hace falta importar ningún `.sql` a mano: el servidor aplica las migraciones pendientes al arrancar.
 - El catálogo (`shop_items`), los paquetes y los productos se **sincronizan** en cada arranque desde `config/economy.json` y el catálogo compartido. Lo que desaparece se marca como no disponible; no se borra.
 
 ## 8. Login Google
@@ -414,7 +417,31 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
 - Hats: la pestaña existe, pero hoy solo hay "Sin hat" (gratuito), así que aparece vacía con "Los hats llegarán pronto".
 - Para las pruebas en vivo de red, `test/fixtures/economy-free.json` deja todos los cosméticos gratis. Solo es una fixture de pruebas y el servidor real no la usa.
 
-## 21. Archivos modificados (esta fase)
+### Trades públicos y ajustes del inicio (2026-09-28, segunda entrega)
+
+**IMPLEMENTADO · PROBADO (servidor en SQLite y MariaDB; navegador Chromium).**
+
+- **Trades públicos (tablón):**
+  - Pestaña "Trades públicos" en el Trade, con contador. Cada publicación muestra quién la hizo, lo que ofrece y lo que busca (o "Acepta ofertas"), cuánto le queda y la pista "Tienes lo que busca".
+  - **Publicar:** en "Mis items", el interruptor "Publicar en el tablón" (o el botón "Publicar trade" del tablón) permite elegir de 1 a 4 items propios y, si se quiere, hasta 4 items buscados del catálogo ("Lo que buscas").
+  - **Negociar:** abre el constructor con el dueño ya elegido, su publicación en "Recibes" y en "Ofreces" lo que busca y ya tienes. Se puede cambiar todo. La oferta llega al dueño marcada "por tu publicación", y él la acepta, rechaza o contraoferta como cualquier otra.
+  - **"Mis publicaciones":** ves las tuyas con el número de ofertas recibidas y puedes retirarlas.
+  - **Cierre automático:** al completarse un trade nacido de una publicación, esta se cierra (COMPLETED); las publicaciones que ofrecían items ya entregados pasan a INVALID; las de surfistas bloqueados no se ven; caducan a las `listingTTLHours` (168 h), y cada cuenta puede tener como mucho `maxOpenListings` (5) abiertas.
+- **Trade:**
+  - título con 🌊;
+  - el modal se abre ya con su tamaño final (altura fija), en vez de abrirse pequeño y crecer al cargar;
+  - para invitados usa los mismos botones de Google y Discord que el menú (`.auth-btn`).
+- **Inicio:**
+  - se quitan "SUBE A TU TABLA" y los datos (playas, vueltas, estilo);
+  - en la caja de JUGAR quedan solo **Jugar en solitario** y, con sesión, **Cerrar sesión**. Desaparece el bloque de nick, monedas y "Cerrar sesión" en texto;
+  - sin sesión, **Continuar con Google / Discord** va abajo a la izquierda, encima de los controles;
+  - abajo a la derecha, el **icono de Discord**. Abre la invitación de `DISCORD_INVITE_URL` (en `servidor/.env`; solo https). Sin ella, explica que falta configurarla.
+- **Botón cerrar de todos los modales:** Perfil, Ajustes, Trade, Tienda y Salas usan el mismo círculo que "Crear partida" (44 px, `#143c4a9c`, borde blanco translúcido y coral al pasar el ratón).
+- **Pausa (ESC):**
+  - usa el cristal de los demás modales y los botones del juego: REANUDAR dorado como JUGAR, y "Salir al menú" como los botones secundarios del inicio;
+  - antes, `font: 900 16px inherit` era CSS inválido y los botones salían con la fuente del sistema.
+
+
 
 - `client/index.html`: logo SVG, panel de acceso, botones de Google y Discord, datos con iconos, perfil y tienda (monedero, pestaña Conseguir monedas).
 - `client/src/ui/shop.js`: precios, propiedad, compra, equipar en cuenta y Conseguir monedas.
@@ -524,7 +551,7 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
 - Recuperar el equipo de la cuenta en el modo solitario (hoy usa el mismo perfil en memoria; funciona, pero sin validación del servidor porque la práctica es local).
 - Prueba en vivo de la recompensa al terminar una carrera online entera (la lógica está probada a nivel de unidad).
 - Cabeceras CSP y despliegue con HTTPS.
-- Trade: tablón de **Trades públicos** ("tengo X, busco Y") y lista de **jugadores recientes** para elegir destinatario (segunda entrega).
+- Trade: lista de **jugadores recientes** para elegir destinatario.
 - Trade: aviso en tiempo real de ofertas nuevas (hoy el globo se actualiza al abrir el menú o el Trade).
 
 ## 27. Configuración externa pendiente
@@ -536,6 +563,7 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` y redirect | Discord Developer Portal | BLOQUEADO (dueño) |
 | `PUBLIC_URL` con dominio https + `SESSION_SECRET` + `NODE_ENV=production` | Servidor de producción | BLOQUEADO (dueño) |
 | Proveedor de pagos, credenciales y webhook | Proveedor elegido | BLOQUEADO (dueño) |
+| `DISCORD_INVITE_URL` (icono de Discord del inicio) | `servidor/.env` | PENDIENTE (dueño) |
 | Precios de artículos | `servidor/config/economy.json` | IMPLEMENTADO (2026-09-28, sección 16) |
 | Precios de paquetes Oro → Normales | `servidor/config/economy.json` | PENDIENTE (decisión de negocio) |
 
@@ -558,6 +586,10 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Trades públicos, inicio simplificado y modales unificados
+- Tablón de Trades públicos (publicar, negociar, retirar) con migración 003. Trade con 🌊 y sin redimensionarse al abrir.
+- Inicio: JUGAR + Jugar en solitario (+ Cerrar sesión), acceso con Google/Discord abajo a la izquierda e icono de Discord abajo a la derecha. Botón cerrar idéntico en todos los modales y pausa con los botones del juego.
 
 ### 2026-09-28 · Sistema de Trade
 - Intercambio de items por items (sin monedas) solo para cuentas registradas, con código de surfista, ofertas, contraofertas, caducidad, bloqueos, historial y administración por consola (sección "Trade").

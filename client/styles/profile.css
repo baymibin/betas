@@ -6,8 +6,9 @@
 .profile-dialog::backdrop{background:linear-gradient(#001d2c66,#00172599),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;backdrop-filter:blur(6px)}
 .profile-shell{position:relative;max-height:94dvh;overflow:auto;box-sizing:border-box;padding:24px 28px 16px;display:flex;flex-direction:column;gap:14px;
   background:linear-gradient(115deg,#062c40ee 0%,#063a4cde 50%,#074253c4 100%),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;scrollbar-width:thin;scrollbar-color:#57e3ee55 transparent}
-.profile-close{position:absolute;top:16px;right:18px;z-index:5;width:46px;height:46px;border-radius:50%;border:1.5px solid #cdf7ff99;background:#06283acc;color:#fff;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 4px 14px #0009}
-.profile-close:hover{background:#0b4b5e}
+/* Botón cerrar: el mismo círculo de 44 px que La tiendita y Crear partida (#shop-close / .room-close). */
+.profile-close{position:absolute;top:16px;right:18px;z-index:5;display:grid;place-items:center;padding:0;width:44px;height:44px;border-radius:50%;border:1px solid #ffffff79;background:#143c4a9c;color:#fff;font-size:29px;line-height:1;cursor:pointer;box-shadow:0 4px 14px #00212e66}
+.profile-close:hover{background:#ff735c;border-color:#ffb49c}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 .profile-layout{display:grid;grid-template-columns:minmax(0,45fr) minmax(0,55fr);gap:22px;align-items:start}

@@ -334,7 +334,7 @@
  <main class="home-main">
   <header class="home-top"><span class="home-tag">EL OCÉANO ES TU PISTA</span><span class="home-online"><svg class="home-online-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.5-.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 19.2C2 15.8 5.1 13 9 13s7 2.8 7 6.2V20H2v-.8Zm15.2.8v-.8c0-1.9-.7-3.6-1.9-4.9.4-.1.8-.1 1.2-.1 3 0 5.5 2.1 5.5 4.8v1h-4.8Z"/></svg>MULTIJUGADOR · HASTA <b>8</b> SURFISTAS</span></header>
   <section class="home-play" aria-label="Empezar a jugar">
-   <span class="home-eyebrow">SUBE A TU TABLA</span><h1 class="home-logo" aria-label="Surf Salvaje"><svg viewBox="0 0 560 262" aria-hidden="true" focusable="false">
+   <h1 class="home-logo" aria-label="Surf Salvaje"><svg viewBox="0 0 560 262" aria-hidden="true" focusable="false">
     <defs>
      <linearGradient id="logo-surf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".62" stop-color="#eefbff"/><stop offset="1" stop-color="#b9e8ff"/></linearGradient>
      <linearGradient id="logo-salvaje" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff59a"/><stop offset=".42" stop-color="#ffd23a"/><stop offset=".8" stop-color="#ffab12"/><stop offset="1" stop-color="#f08000"/></linearGradient>
@@ -354,22 +354,27 @@
    <div class="play-box"><label for="nickname">TU NICK</label>
     <div class="nick-field"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.6 4.6 0 1 0 0-9.2 4.6 4.6 0 0 0 0 9.2Zm0 2.2c-4.5 0-8.2 2.6-8.2 5.9V21h16.4v-.9c0-3.3-3.7-5.9-8.2-5.9Z"/></svg><input id="nickname" maxlength="16" placeholder="Nombre de surfer" autocomplete="off"></div>
     <button id="start-btn">JUGAR <span aria-hidden="true">➜</span></button>
-    <div class="auth-divider" id="auth-divider"><span>O CONTINÚA CON</span></div>
-    <div class="auth-buttons" id="auth-guest">
-     <button type="button" id="login-google" class="auth-btn auth-google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Continuar con Google</span></button>
-     <button type="button" id="login-discord" class="auth-btn auth-discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffffff" d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.028C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.011c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.332-.956 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.332-.946 2.418-2.157 2.418Z"/></svg><span>Continuar con Discord</span></button>
-    </div>
-    <div class="auth-account" id="auth-user" hidden>
-     <button type="button" class="auth-account-main" id="auth-open-profile" aria-label="Abrir perfil"><img id="auth-avatar" alt="" referrerpolicy="no-referrer"><span class="auth-account-text"><strong id="auth-name">Surfer</strong><small id="auth-via">Sesión iniciada</small></span></button>
-     <div class="auth-wallet"><span class="coin-chip" title="Tablas Normales"><img src="/assets/images/currency/tabla-normal.svg" alt="Tablas Normales"><b id="auth-normal">0</b></span><span class="coin-chip gold" title="Tablas de Oro"><img src="/assets/images/currency/tabla-oro.svg" alt="Tablas de Oro"><b id="auth-gold">0</b></span></div>
-     <button type="button" id="auth-logout" class="auth-logout">Cerrar sesión</button>
+    <div class="play-actions">
+     <button id="practice-btn" type="button" class="play-secondary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/></svg>Jugar en solitario</button>
+     <button id="auth-logout" type="button" class="play-secondary is-logout" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cerrar sesión</button>
     </div>
     <p id="auth-message" class="auth-message" role="status" aria-live="polite"></p>
    </div>
-   <div class="home-facts"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.5-.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 19.2C2 15.8 5.1 13 9 13s7 2.8 7 6.2V20H2v-.8Zm15.2.8v-.8c0-1.9-.7-3.6-1.9-4.9.4-.1.8-.1 1.2-.1 3 0 5.5 2.1 5.5 4.8v1h-4.8Z"/></svg><b>8</b><small>playas</small></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h3v3a4.5 4.5 0 0 1-4.1 4.5A5 5 0 0 1 13 15.9V18h3v3H8v-3h3v-2.1a5 5 0 0 1-2.9-3.4A4.5 4.5 0 0 1 4 8V5h3V3Zm0 4H6v1a2.5 2.5 0 0 0 1.3 2.2A6 6 0 0 1 7 8.5V7Zm10 0v1.5c0 .6-.1 1.2-.3 1.7A2.5 2.5 0 0 0 18 8V7h-1Z"/></svg><b>3</b><small>vueltas</small></span><span><svg viewBox="0 0 32 24" aria-hidden="true"><path d="M8.5 5C4.9 5 2 8.1 2 12s2.9 7 6.5 7c2.9 0 5-2 7.5-5 2.5 3 4.6 5 7.5 5 3.6 0 6.5-3.1 6.5-7s-2.9-7-6.5-7c-2.9 0-5 2-7.5 5-2.5-3-4.6-5-7.5-5Zm0 3.2c1.6 0 3 1.3 5.4 3.8-2.4 2.5-3.8 3.8-5.4 3.8-2 0-3.4-1.7-3.4-3.8s1.4-3.8 3.4-3.8Zm15 0c2 0 3.4 1.7 3.4 3.8s-1.4 3.8-3.4 3.8c-1.6 0-3-1.3-5.4-3.8 2.4-2.5 3.8-3.8 5.4-3.8Z"/></svg><small>estilo</small></span></div><div id="best-start" class="best" style="display:none"></div>
-   <button id="practice-btn" class="practice-link" type="button">Practicar en solitario</button>
+   <div id="best-start" class="best" style="display:none"></div>
   </section>
-  <footer class="home-bottom"><span>← → DIRIGIR &nbsp; W / ↑ ACELERAR &nbsp; SHIFT TURBO &nbsp; ESPACIO SALTAR &nbsp; E HABILIDAD &nbsp; ESC PAUSA</span><span>STICKMAN SURF RACING</span></footer>
+  <footer class="home-bottom">
+   <div class="home-bottom-left">
+    <div class="home-login" id="auth-guest">
+     <span class="home-login-label">GUARDA TU PROGRESO</span>
+     <div class="home-login-buttons">
+     <button type="button" id="login-google" class="auth-btn auth-google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Continuar con Google</span></button>
+     <button type="button" id="login-discord" class="auth-btn auth-discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#ffffff" d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.028C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.011c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.332-.956 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.332-.946 2.418-2.157 2.418Z"/></svg><span>Continuar con Discord</span></button>
+     </div>
+    </div>
+    <span class="home-controls">← → DIRIGIR &nbsp; W / ↑ ACELERAR &nbsp; SHIFT TURBO &nbsp; ESPACIO SALTAR &nbsp; E HABILIDAD &nbsp; ESC PAUSA</span>
+   </div>
+   <div class="home-bottom-right"><span>STICKMAN SURF RACING</span><a id="home-discord" class="home-discord" href="#" target="_blank" rel="noopener noreferrer" aria-label="Comunidad de Discord" title="Comunidad de Discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.028C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.011c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.332-.956 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.332-.946 2.418-2.157 2.418Z"/></svg></a></div>
+  </footer>
  </main>
 </div>
 <dialog id="profile-dialog" class="profile-dialog" aria-labelledby="profile-title">
@@ -410,7 +415,7 @@
     <header class="trade-header">
       <div class="trade-heading">
         <span class="trade-kicker"><span aria-hidden="true">🌴</span> SURF CLUB · TRADE</span>
-        <h2 id="trade-title" class="trade-title">Trade <img data-src="/assets/images/menu/menu-trade.webp" alt=""></h2>
+        <h2 id="trade-title" class="trade-title">Trade <span class="trade-title-wave" aria-hidden="true">🌊</span></h2>
         <p class="trade-sub">Intercambia tus items con otros surfistas.</p>
       </div>
       <div id="trade-mycode" class="trade-mycode"></div>
@@ -470,7 +475,7 @@
     <p class="pause-desc">¿Deseas continuar la carrera o volver al menú principal?</p>
     <div class="pause-btns">
       <button id="pause-resume-btn" type="button" class="pause-btn resume">REANUDAR</button>
-      <button id="pause-quit-btn" type="button" class="pause-btn quit">SALIR AL MENÚ</button>
+      <button id="pause-quit-btn" type="button" class="pause-btn quit">Salir al menú</button>
     </div>
   </div>
 </dialog>
