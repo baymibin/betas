@@ -242,14 +242,14 @@ async function catalogView(root, category = 'board') {
 async function economyView(root) {
   const e = await api('economy');
   const packRow = p => `<tr><td><input name="id" value="${esc(p.id)}" maxlength="32"></td><td><input name="name" value="${esc(p.name)}" maxlength="40"></td><td><input name="normalAmount" type="number" min="1" value="${p.normalAmount}"></td><td><input name="goldPrice" type="number" min="1" value="${p.goldPrice ?? ''}" placeholder="sin precio = inactivo"></td><td><button type="button" class="btn small ghost" data-del>Quitar</button></td></tr>`;
-  const prodRow = p => `<tr><td><input name="id" value="${esc(p.id)}" maxlength="32"></td><td><input name="name" value="${esc(p.name)}" maxlength="40"></td><td><input name="goldAmount" type="number" min="1" value="${p.goldAmount}"></td><td><input name="priceMinor" type="number" min="1" value="${p.priceMinor ?? ''}" placeholder="céntimos"></td><td><input name="currency" value="${esc(p.currency || 'EUR')}" maxlength="3"></td><td><button type="button" class="btn small ghost" data-del>Quitar</button></td></tr>`;
+  const prodRow = p => `<tr><td><input name="id" value="${esc(p.id)}" maxlength="32"></td><td><input name="name" value="${esc(p.name)}" maxlength="40"></td><td><input name="goldAmount" type="number" min="1" value="${p.goldAmount}"></td><td><input name="priceMinor" type="number" min="1" value="${p.priceMinor ?? ''}" placeholder="centavos (999 = 9.99)"></td><td><input name="currency" value="${esc(p.currency || 'USD')}" maxlength="3"></td><td><button type="button" class="btn small ghost" data-del>Quitar</button></td></tr>`;
   const r = e.rewards || {};
   root.innerHTML = `
     <section class="panel"><h3>Paquetes Tablas de Oro → Tablas Normales</h3><p class="muted">Lo que ven los jugadores en La tiendita → Monedas. Sin precio en oro, el paquete queda inactivo.</p>
       <table class="edit" id="packs"><thead><tr><th>ID</th><th>Nombre</th><th>Tablas Normales</th><th>Precio en Oro</th><th></th></tr></thead><tbody>${(e.exchangePackages || []).map(packRow).join('')}</tbody></table>
       <button class="btn small ghost" id="add-pack">+ Añadir paquete</button></section>
-    <section class="panel"><h3>Productos de Tablas de Oro (dinero real)</h3><p class="muted">Precio en céntimos (199 = 1,99 €). La compra real sigue desactivada hasta integrar un proveedor de pago.</p>
-      <table class="edit" id="prods"><thead><tr><th>ID</th><th>Nombre</th><th>Tablas de Oro</th><th>Precio (céntimos)</th><th>Moneda</th><th></th></tr></thead><tbody>${(e.goldProducts || []).map(prodRow).join('')}</tbody></table>
+    <section class="panel"><h3>Productos de Tablas de Oro (PayPal)</h3><p class="muted">Precio en centavos (999 = 9.99 USD). Se compran con PayPal en La tiendita → Monedas cuando el servidor tiene PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET. Sin precio salen como PRÓXIMAMENTE.</p>
+      <table class="edit" id="prods"><thead><tr><th>ID</th><th>Nombre</th><th>Tablas de Oro</th><th>Precio (centavos)</th><th>Moneda</th><th></th></tr></thead><tbody>${(e.goldProducts || []).map(prodRow).join('')}</tbody></table>
       <button class="btn small ghost" id="add-prod">+ Añadir producto</button></section>
     <section class="panel"><h3>Recompensas de carrera (Tablas Normales)</h3>
       <div class="upload-grid"><label class="check"><input id="rw-enabled" type="checkbox" ${r.enabled ? 'checked' : ''}> Activadas</label>
@@ -260,14 +260,14 @@ async function economyView(root) {
     <button class="btn gold" id="save-economy">Guardar monedas</button>`;
   const wireDel = () => root.querySelectorAll('[data-del]').forEach(b => b.onclick = () => b.closest('tr').remove());
   $('add-pack').onclick = () => { $('packs').tBodies[0].insertAdjacentHTML('beforeend', packRow({id: 'normal_' + Date.now().toString(36).slice(-4), name: 'Paquete', normalAmount: 1000, goldPrice: null})); wireDel(); };
-  $('add-prod').onclick = () => { $('prods').tBodies[0].insertAdjacentHTML('beforeend', prodRow({id: 'gold_' + Date.now().toString(36).slice(-4), name: 'Oro', goldAmount: 100, priceMinor: null, currency: 'EUR'})); wireDel(); };
+  $('add-prod').onclick = () => { $('prods').tBodies[0].insertAdjacentHTML('beforeend', prodRow({id: 'gold_' + Date.now().toString(36).slice(-4), name: 'Oro', goldAmount: 100, priceMinor: null, currency: 'USD'})); wireDel(); };
   wireDel();
   const intOrNull = v => v === '' ? null : Number(v);
   $('save-economy').onclick = async () => {
     const rows = id => [...$(id).tBodies[0].rows].map(tr => Object.fromEntries([...tr.querySelectorAll('input')].map(i => [i.name, i.value.trim()])));
     const body = {
       exchangePackages: rows('packs').map(p => ({id: p.id, name: p.name, normalAmount: Number(p.normalAmount), goldPrice: intOrNull(p.goldPrice)})),
-      goldProducts: rows('prods').map(p => ({id: p.id, name: p.name, goldAmount: Number(p.goldAmount), priceMinor: intOrNull(p.priceMinor), currency: p.currency.toUpperCase() || 'EUR'})),
+      goldProducts: rows('prods').map(p => ({id: p.id, name: p.name, goldAmount: Number(p.goldAmount), priceMinor: intOrNull(p.priceMinor), currency: p.currency.toUpperCase() || 'USD'})),
       rewards: {enabled: $('rw-enabled').checked, finish: Number($('rw-finish').value), placeBonus: $('rw-bonus').value.split(',').map(v => v.trim()).filter(Boolean).map(Number), minHumans: Number($('rw-min').value), dailyCap: intOrNull($('rw-cap').value)}
     };
     try { await api('economy', body); toast('Monedas guardadas.'); } catch (error) { toast(msg(error), true); }

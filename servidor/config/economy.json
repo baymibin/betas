@@ -44,9 +44,10 @@
     {"id": "normal_large",  "name": "Paquete grande",  "normalAmount": 5000, "goldPrice": null}
   ],
 
+  "_goldProducts": "Tablas de Oro que se compran con PayPal. priceMinor = precio en centavos de la divisa (999 = 9.99 USD). null = sin precio: el paquete sale como PRÓXIMAMENTE. También se editan en /admin → Monedas.",
   "goldProducts": [
-    {"id": "gold_small",  "name": "Bolsa de Tablas de Oro",   "goldAmount": 100,  "priceMinor": null, "currency": "EUR"},
-    {"id": "gold_medium", "name": "Cofre de Tablas de Oro",   "goldAmount": 550,  "priceMinor": null, "currency": "EUR"},
-    {"id": "gold_large",  "name": "Tesoro de Tablas de Oro",  "goldAmount": 1200, "priceMinor": null, "currency": "EUR"}
+    {"id": "gold_small",  "name": "Paquete pequeño", "goldAmount": 100,  "priceMinor": null, "currency": "USD"},
+    {"id": "gold_medium", "name": "Paquete mediano", "goldAmount": 550,  "priceMinor": null, "currency": "USD"},
+    {"id": "gold_large",  "name": "Paquete grande",  "goldAmount": 1200, "priceMinor": null, "currency": "USD"}
   ]
 }

@@ -24,6 +24,11 @@ export const MESSAGES = {
   already_owned: 'Ya tienes este artículo.',
   package_inactive: 'Este paquete aún no está disponible.',
   payments_disabled: 'La compra de Tablas de Oro todavía no está disponible.',
+  product_not_found: 'Ese paquete ya no existe.',
+  product_unavailable: 'Ese paquete todavía no está a la venta.',
+  too_many_open_orders: 'Tienes varios pagos sin terminar. Espera un poco antes de empezar otro.',
+  paypal_unavailable: 'PayPal no responde ahora mismo. Inténtalo en unos minutos.',
+  order_not_found: 'No se encontró ese pago.',
   rate_limited: 'Demasiados intentos. Espera un momento.',
   csrf_failed: 'La sesión no es válida. Recarga la página.',
   invalid_nickname: 'Ese nick no es válido.',
@@ -129,6 +134,9 @@ export async function exchange(packageId, id = requestId()) {
 }
 export const transactions = (limit = 30) => api('/api/wallet/transactions?limit=' + limit);
 export const goldProducts = () => api('/api/payments/products');
+// Crea la orden de PayPal en el servidor (precio del servidor) y devuelve {orderId, approveUrl}.
+export const checkout = productId => api('/api/payments/checkout', {method: 'POST', body: {productId}});
+export const orderStatus = orderId => api('/api/payments/orders/' + encodeURIComponent(orderId));
 
 // ---------- Trade (items por items, solo con cuenta). El servidor valida todo. ----------
 export const trade = {

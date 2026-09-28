@@ -5,7 +5,8 @@
 //   GET  /api/me                                   -> estado de la sesión, perfil, monedero...
 //   GET  /api/shop/catalog · POST /api/shop/purchase · POST /api/shop/equip · GET /api/catalog/custom
 //   GET  /api/coins/packages · POST /api/coins/exchange · GET /api/wallet/transactions
-//   GET  /api/payments/products · POST /api/payments/checkout · POST /api/payments/webhook/:provider
+//   GET  /api/payments/products · POST /api/payments/checkout · GET /api/payments/orders/:id
+//   GET  /api/payments/paypal/return|cancel (vuelta de PayPal) · POST /api/payments/webhook/paypal (firmado)
 //   POST /api/account/nickname · POST /api/account/unlink · POST /api/account/migrate-local
 //   GET  /api/trade/summary · /api/trade/inventory · /api/trade/user?code= · /api/trade/offers?box= · /api/trade/blocked · /api/trade/listings?mine=1
 //   POST /api/trade/offers · /api/trade/listings · /api/trade/listings/withdraw · /api/trade/accept · /api/trade/decline · /api/trade/cancel · /api/trade/block · /api/trade/unblock
@@ -147,7 +148,7 @@ export function mountApi(app, {auth, economy, trade, economyConfig = {}, config,
 
   // ---------- Cuenta ----------
   route('get', '/api/me', async ctx => {
-    const payments_ = {enabled: !!payments.enabled};
+    const payments_ = {enabled: !!payments.enabled, provider: payments.enabled ? 'paypal' : null, sandbox: payments.mode === 'sandbox'};
     if (!ctx.userId) return {json: {authenticated: false, providers: providers(), payments: payments_, links: links()}};
     return {json: {...await profileOf(ctx.userId), csrf: ctx.session.csrf, providers: providers(), payments: payments_, links: links()}};
   });
@@ -214,10 +215,42 @@ export function mountApi(app, {auth, economy, trade, economyConfig = {}, config,
     route('post', '/api/trade/unblock', async ctx => ({json: await trade.unblock(ctx.userId, str(ctx.body.code))}), {group: 'write'});
   }
 
-  // ---------- Pagos reales (preparado, deshabilitado) ----------
-  route('get', '/api/payments/products', async () => ({json: {enabled: !!payments.enabled, products: await economy.goldProducts()}}));
-  route('post', '/api/payments/checkout', () => { throw new EconomyError('payments_disabled', 503); }, {group: 'write'});
-  // El webhook del proveedor no lleva sesión ni CSRF: se validará con su firma cuando exista la
-  // integración. Hasta entonces no acepta nada (no se acredita oro por peticiones sin verificar).
-  app.post('/api/payments/webhook/:provider', res => { res.writeStatus('501 Not Implemented').writeHeader('Content-Type', 'application/json').end('{"error":"payments_not_integrated"}'); });
+  // ---------- Pagos reales: Tablas de Oro con PayPal (src/payments.js) ----------
+  route('get', '/api/payments/products', async () => ({json: {enabled: !!payments.enabled, provider: payments.enabled ? 'paypal' : null, products: payments.products ? await payments.products() : await economy.goldProducts()}}));
+  route('post', '/api/payments/checkout', async ctx => {
+    if (!payments.checkout) throw new EconomyError('payments_disabled', 503);
+    return {json: await payments.checkout(ctx.userId, String(ctx.body.productId || ''))};
+  }, {group: 'write'});
+  route('get', '/api/payments/orders/:id', async ctx => {
+    if (!ctx.userId) throw new EconomyError('login_required', 401);
+    if (!payments.orderStatus) throw new EconomyError('order_not_found', 404);
+    return {json: {...await payments.orderStatus(ctx.userId, ctx.params[0]), wallet: await economy.wallet(ctx.userId)}};
+  });
+  // Vuelta desde PayPal. No acredita por llegar aquí: completeReturn pide a PayPal que cobre la
+  // orden y solo acredita si PayPal confirma la captura por el importe exacto.
+  const back = r => ({redirect: '/?pago=' + encodeURIComponent(String(r.status || 'UNKNOWN').toLowerCase()) + (r.orderId ? '&orden=' + encodeURIComponent(r.orderId) : '')});
+  route('get', '/api/payments/paypal/return', async ctx => back(payments.completeReturn ? await payments.completeReturn(ctx.query.token) : {}), {group: 'write', csrf: false});
+  route('get', '/api/payments/paypal/cancel', async ctx => back(payments.cancel ? await payments.cancel(ctx.query.token) : {}), {group: 'write', csrf: false});
+  // Webhook de PayPal: sin sesión ni CSRF; se autentica comprobando su firma con PayPal.
+  app.post('/api/payments/webhook/:provider', (res, req) => {
+    let aborted = false;
+    res.onAborted(() => { aborted = true; });
+    const provider = req.getParameter(0);
+    const headers = {};
+    req.forEach((k, v) => { headers[k.toLowerCase()] = v; });
+    const reply = (status, body) => { if (!aborted) res.cork(() => res.writeStatus(String(status)).writeHeader('Content-Type', 'application/json').end(JSON.stringify(body))); };
+    const supported = provider === 'paypal' && !!payments.webhook;
+    const chunks = [];
+    let size = 0;
+    res.onData((chunk, last) => {
+      size += chunk.byteLength;
+      if (size > 256 * 1024) { if (!aborted) { aborted = true; res.cork(() => res.writeStatus('413 Payload Too Large').end()); } return; }
+      chunks.push(Buffer.from(chunk.slice(0)));
+      if (!last || aborted) return;
+      if (!supported) return reply(501, {error: 'payments_not_integrated'});
+      payments.webhook(headers, Buffer.concat(chunks).toString('utf8'))
+        .then(r => reply(r.status, r.body))
+        .catch(error => { console.error('[payments] webhook', error); reply(500, {error: 'server_error'}); });
+    });
+  });
 }

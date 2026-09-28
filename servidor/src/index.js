@@ -17,6 +17,8 @@ import {createEconomy} from './economy.js';
 import {createTrade} from './trade.js';
 import {authConfig, createAuth, SESSION_COOKIE} from './auth.js';
 import {mountApi, parseCookies} from './api.js';
+import {createPayPal, paypalSettings} from './paypal.js';
+import {createPayments} from './payments.js';
 import {createAdmin} from './admin.js';
 import {mountAdmin} from './admin-api.js';
 
@@ -256,10 +258,13 @@ if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD && !await admin.countUs
   catch (error) { console.error('[admin] no se pudo crear el administrador de .env:', error.code || error.message); }
 }
 mountAdmin(app, {admin, config: authSettings});
-mountApi(app, {auth, economy, trade, economyConfig, config: authSettings, onEquipmentChanged: refreshEquipment});
+// Tablas de Oro con PayPal: activo si servidor/.env tiene PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET.
+const paypal = createPayPal(paypalSettings());
+const payments = createPayments({db, economy, paypal, publicUrl: authSettings.publicUrl});
+mountApi(app, {auth, economy, trade, economyConfig, config: authSettings, onEquipmentChanged: refreshEquipment, payments});
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));
   console.log('Base de datos: ' + describeDatabase());
-  console.log('Cuentas: Google ' + (auth.enabled('google') ? 'activo' : 'sin configurar') + ' · Discord ' + (auth.enabled('discord') ? 'activo' : 'sin configurar') + ' · pagos reales deshabilitados');
+  console.log('Cuentas: Google ' + (auth.enabled('google') ? 'activo' : 'sin configurar') + ' · Discord ' + (auth.enabled('discord') ? 'activo' : 'sin configurar') + ' · PayPal ' + (paypal.enabled ? 'activo (' + paypal.mode + (paypal.webhookEnabled ? ', webhook' : ', sin webhook') + ')' : 'sin configurar'));
 });

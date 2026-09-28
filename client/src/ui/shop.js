@@ -70,38 +70,77 @@ async function act(slot,id){
   finally{busy=false;render();}
 }
 function itemName(slot,id){return slot==='wing'?`${wings[id]} Wings`:slot==='board'?boards[id]:slot==='hat'?hats[id]:characters[id];}
+// Pestaña Monedas (como la referencia): dos vistas con tres paquetes cada una.
+//  - Comprar Tablas de Oro con PayPal: el servidor crea la orden con SU precio y devuelve la URL
+//    de PayPal; el oro solo se acredita cuando el servidor confirma el cobro con PayPal.
+//  - Tablas de Oro → Tablas Normales: el cambio de siempre (/api/coins/exchange).
+const PACK_ART=['/assets/images/currency/coins-small.svg','/assets/images/currency/coins-medium.svg','/assets/images/currency/coins-large.svg'];
+const PACK_BADGES=[['popular','👑','POPULAR'],['value','🔥','MEJOR VALOR'],['max','💎','MÁXIMO']];
+const PAYPAL_MARK='<svg class="pp-mark" viewBox="0 0 24 28" aria-hidden="true"><path fill="#003087" d="M7.3 26.6H2.6a.6.6 0 0 1-.6-.7L5.3 2.2A1 1 0 0 1 6.3 1.4h7.9c4.5 0 6.8 2.3 6.2 6.1-.8 5.2-4.2 7.4-8.8 7.4H9.2a1 1 0 0 0-1 .8z"/><path fill="#0079c1" d="M21.3 8c-.8 5-4.1 7.6-8.9 7.6h-2a1 1 0 0 0-1 .8l-1.3 8.4-.3 1.8h3.6a.9.9 0 0 0 .9-.7l.8-5.1a.9.9 0 0 1 .9-.7h.6c3.9 0 6.9-1.6 7.8-6.1.4-2.1.1-3.7-.9-4.8z"/></svg>';
+let coinsView='buy';
+const moneyText=p=>p.price?`${p.currency==='USD'?'$':''}${p.price} ${p.currency}`:'Precio por definir';
+function coinRow(i,{name,amount,price,button}){
+  const [cls,icon,label]=PACK_BADGES[i]||PACK_BADGES[2];
+  const row=document.createElement('div');row.className='coin-pack';
+  row.innerHTML=`<span class="coin-art"><img src="${PACK_ART[Math.min(i,2)]}" alt=""></span>
+    <div class="coin-text"><strong>${name.toUpperCase()}</strong><em class="coin-badge ${cls}"><i aria-hidden="true">${icon}</i>${label}</em><small>${amount}</small><small class="coin-price">${price}</small></div>`;
+  row.append(button);return row;
+}
 async function renderCoins(){
   detailName.textContent='Monedas';detailRarity.textContent='MONEDERO';
-  detailDescription.textContent='Las Tablas de Oro se cambian por Tablas Normales. En La tiendita todo se compra con Tablas Normales.';
+  detailDescription.textContent='Las Tablas de Oro se compran con PayPal y se cambian por Tablas Normales. En La tiendita todo se compra con Tablas Normales.';
   detailEquip.textContent='TABLAS NORMALES';detailEquip.disabled=true;
   const panel=document.createElement('div');panel.className='coins-panel';
-  panel.innerHTML=`<h3>TABLAS DE ORO → TABLAS NORMALES</h3><p>${account.authenticated?'Elige un paquete. El cambio se hace en el servidor y queda en tu historial.':'Inicia sesión con Google o Discord para usar tu monedero.'}</p><div id="coin-packs">Cargando paquetes...</div>
-    <h3>CONSEGUIR TABLAS DE ORO</h3><p id="gold-status">Cargando...</p><div id="gold-products"></div>`;
+  const buy=coinsView==='buy';
+  panel.innerHTML=`<div class="coins-switch" role="tablist">
+      <button type="button" role="tab" data-view="buy" aria-selected="${buy}">${coinsIcon('GOLD_COIN')}Comprar Tablas de Oro</button>
+      <button type="button" role="tab" data-view="exchange" aria-selected="${!buy}">${coinsIcon('NORMAL_COIN')}Oro → Normales</button></div>
+    <div class="coins-box"><h3>${buy?'TABLAS DE ORO <span>·</span> PAYPAL':'TABLAS DE ORO <span>⟶</span> TABLAS NORMALES'}</h3>
+      <p>${!account.authenticated?'Inicia sesión con Google o Discord para usar tu monedero.':buy?'Elige un paquete y paga con PayPal de forma segura.':'Elige un paquete. El cambio se hace en el servidor y queda en tu historial.'}</p>
+      <div class="coin-list">Cargando paquetes...</div></div>
+    <div class="coins-info"><i aria-hidden="true">i</i><div><strong></strong><p></p></div></div>`;
+  panel.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{coinsView=b.dataset.view;note='';render();});
   grid.append(panel);
+  const list=panel.querySelector('.coin-list'),info=panel.querySelector('.coins-info');
+  const setInfo=(title,text)=>{info.querySelector('strong').textContent=title;info.querySelector('p').innerHTML=text;};
+  if(buy){
+    setInfo('CONSEGUIR TABLAS DE ORO','Cargando...');
+    try{
+      const {enabled,products}=await accountApi.goldProducts();
+      list.replaceChildren(...products.map((p,i)=>{
+        const button=document.createElement('button');button.type='button';button.className='paypal-btn';
+        const state=!enabled||!p.available?'PRÓXIMAMENTE':!account.authenticated?'INICIA SESIÓN':busy?'CONECTANDO…':'PAGO SEGURO';
+        button.innerHTML=`<span class="pp-line">${PAYPAL_MARK}<span>Comprar con</span><b><i>Pay</i>Pal</b></span><small>${state}</small>`;
+        button.disabled=!enabled||!p.available||!account.authenticated||busy;
+        button.onclick=async()=>{if(busy)return;busy=true;note='';render();
+          try{const r=await accountApi.checkout(p.id);location.href=r.approveUrl;return;}   // a PayPal; al volver, el servidor confirma el cobro
+          catch(e){note=message(e.code);busy=false;render();}};
+        return coinRow(i,{name:p.name,amount:`${formatCoins(p.goldAmount)} Tablas de Oro`,price:moneyText(p),button});
+      }));
+      if(!products.length)list.textContent='No hay paquetes configurados.';
+      setInfo('CONSEGUIR TABLAS DE ORO',enabled
+        ?`Pagas en <b>PayPal</b> (cuenta o tarjeta) y vuelves al juego. El oro llega cuando PayPal confirma el cobro; luego cámbialo en «Oro → Normales».${account.payments?.sandbox?' <em>Modo de prueba: sin dinero real.</em>':''}`
+        :'La compra de Tablas de Oro con dinero real todavía no está disponible. Se activará cuando el pago con <b>PayPal</b> esté habilitado.');
+    }catch{list.textContent='No se pudo conectar con el servidor de cuentas.';setInfo('CONSEGUIR TABLAS DE ORO','Sin conexión con el servidor.');}
+    return;
+  }
+  setInfo('CÓMO FUNCIONA','Compra Tablas de Oro con <b>PayPal</b> en «Comprar Tablas de Oro» y cámbialas aquí por Tablas Normales para comprar en La tiendita.');
   try{
-    const {packages:list}=await accountApi.packages();
-    panel.querySelector('#coin-packs').innerHTML='';
-    for(const pack of list){
-      const row=document.createElement('div');row.className='coin-pack';
-      const price=pack.goldPrice?`${coinsIcon('GOLD_COIN')} ${formatCoins(pack.goldPrice)} Tablas de Oro`:'Precio por definir';
+    const {packages:packs}=await accountApi.packages();
+    list.replaceChildren(...packs.map((pack,i)=>{
       const enough=account.authenticated&&pack.active&&account.wallet.GOLD_COIN>=pack.goldPrice;
-      row.innerHTML=`${coinsIcon('NORMAL_COIN')}<div><strong>${pack.name.toUpperCase()}</strong><small>${formatCoins(pack.normalAmount)} Tablas Normales · <span class="coin-inline">${price}</span></small></div>`;
-      const button=document.createElement('button');button.type='button';
-      button.textContent=!pack.active?'PRÓXIMAMENTE':!account.authenticated?'INICIA SESIÓN':enough?'CAMBIAR':'SALDO INSUFICIENTE';
+      const button=document.createElement('button');button.type='button';button.className='exchange-btn';
+      button.innerHTML=`<span>${!pack.active?'PRÓXIMAMENTE':!account.authenticated?'INICIA SESIÓN':enough?'CAMBIAR':'SALDO INSUFICIENTE'}</span>${pack.goldPrice?`<small>${coinsIcon('GOLD_COIN')} ${formatCoins(pack.goldPrice)} DE ORO</small>`:''}`;
       button.disabled=!pack.active||!account.authenticated||!enough||busy;
       // Un requestId por clic: si el usuario pulsa dos veces o recarga, el servidor no repite el cambio.
       button.onclick=async()=>{if(busy)return;busy=true;button.disabled=true;
         try{const r=await accountApi.exchange(pack.id);note=`+${formatCoins(r.normalReceived??pack.normalAmount)} Tablas Normales`;}catch(e){note=message(e.code);}
         finally{busy=false;render();}};
-      row.append(button);panel.querySelector('#coin-packs').append(row);
-    }
-    if(!list.length)panel.querySelector('#coin-packs').textContent='No hay paquetes configurados.';
-  }catch{panel.querySelector('#coin-packs').textContent='No se pudo conectar con el servidor de cuentas.';}
-  try{
-    const {enabled,products}=await accountApi.goldProducts();
-    panel.querySelector('#gold-status').textContent=enabled?'Pago seguro con el proveedor configurado.':'La compra de Tablas de Oro con dinero real todavía no está disponible: se activará cuando el pago esté integrado y verificado.';
-    panel.querySelector('#gold-products').innerHTML=products.map(p=>`<div class="coin-pack gold">${coinsIcon('GOLD_COIN')}<div><strong>${p.name.toUpperCase()}</strong><small>${formatCoins(p.goldAmount)} Tablas de Oro</small></div><button type="button" disabled>PRÓXIMAMENTE</button></div>`).join('');
-  }catch{panel.querySelector('#gold-status').textContent='';}
+      return coinRow(i,{name:pack.name,amount:`${formatCoins(pack.normalAmount)} Tablas Normales`,price:pack.goldPrice?`<span class="coin-inline">${coinsIcon('GOLD_COIN')} ${formatCoins(pack.goldPrice)} Tablas de Oro</span>`:'Precio por definir',button});
+    }));
+    list.querySelectorAll('.coin-art img').forEach(img=>img.src=COIN_ICONS.NORMAL_COIN);
+    if(!packs.length)list.textContent='No hay paquetes configurados.';
+  }catch{list.textContent='No se pudo conectar con el servidor de cuentas.';}
 }
 let category='character',opener,selected={character:profile.character,board:profile.board,wing:profile.wing,hat:profile.hat|0};
 const categoryField=slotOf;
@@ -158,12 +197,32 @@ function render(){
   detailEquip.disabled=st.equipped||busy;
 }
 detailEquip.onclick=()=>{if(category!=='coins')act(categoryField(),selected[categoryField()]|0);};
-document.getElementById('shop-btn').onclick=async()=>{
-  opener=document.activeElement;note='';
+async function openShop(startCategory='character',startNote=''){
+  opener=document.activeElement;note=startNote;
   selected={character:profile.character,board:profile.board,wing:profile.wing,hat:profile.hat|0};
-  category='character';dialog.showModal();render();preview.open(selected);
+  category=startCategory;if(startCategory==='coins')coinsView='buy';
+  dialog.showModal();render();preview.open(selected);
   await loadCatalog();if(dialog.open)render();
-};
+}
+document.getElementById('shop-btn').onclick=()=>openShop();
+// Vuelta de PayPal (?pago=estado&orden=id): se abre Monedas con el resultado que decidió el
+// servidor. Aquí no se acredita nada; solo se muestra el estado real de la orden.
+const PAY_RESULT={credited:'¡Pago completado! Tus Tablas de Oro ya están en tu monedero.',paid:'Pago recibido: las Tablas de Oro se están acreditando.',
+  pending:'PayPal está revisando el pago. Las Tablas de Oro llegarán en cuanto lo confirme.',canceled:'Pago cancelado. No se te ha cobrado nada.',
+  failed:'PayPal no aprobó el pago. No se te ha cobrado nada.'};
+{
+  const params=new URLSearchParams(location.search),result=params.get('pago'),order=params.get('orden');
+  if(result){
+    params.delete('pago');params.delete('orden');
+    history.replaceState(null,'',location.pathname+(params.size?'?'+params:'')+location.hash);
+    let text=PAY_RESULT[result]||'No se pudo confirmar el pago. Si PayPal te cobró, el oro llegará solo en unos minutos; si no, escríbenos con el número de orden '+(order||'')+'.';
+    setTimeout(async()=>{   // tras cargar todos los módulos (shop.js y account.js se importan entre sí)
+      await accountApi.refresh();
+      if(result==='credited'&&order)try{const r=await accountApi.orderStatus(order);text=`¡Pago completado! +${formatCoins(r.goldAmount)} Tablas de Oro en tu monedero.`;}catch{}
+      openShop('coins',text);
+    },0);
+  }
+}
 document.getElementById('shop-close').onclick=()=>dialog.close();
 dialog.addEventListener('close',()=>{preview.close();opener?.focus();});
 document.querySelectorAll('#shop-dialog [data-category]').forEach(button=>button.onclick=()=>{category=button.dataset.category;note='';grid.scrollTop=0;render();});

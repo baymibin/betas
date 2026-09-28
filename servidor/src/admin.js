@@ -300,8 +300,8 @@ export function createAdmin(db, {economy, trade, config, uploadsDir, secure = fa
     if (key === 'goldProducts') {
       if (!Array.isArray(value) || value.length > 12) fail('invalid_products');
       return value.map(p => {
-        if (!idOk(p.id) || !int(p.goldAmount, 1) || !(p.priceMinor === null || int(p.priceMinor, 1)) || !/^[A-Z]{3}$/.test(p.currency || 'EUR')) fail('invalid_products', 400, {id: p.id});
-        return {id: p.id, name: text(p.name, 40) || p.id, goldAmount: p.goldAmount, priceMinor: p.priceMinor, currency: p.currency || 'EUR'};
+        if (!idOk(p.id) || !int(p.goldAmount, 1) || !(p.priceMinor === null || int(p.priceMinor, 1)) || !/^[A-Z]{3}$/.test(p.currency || 'USD')) fail('invalid_products', 400, {id: p.id});
+        return {id: p.id, name: text(p.name, 40) || p.id, goldAmount: p.goldAmount, priceMinor: p.priceMinor, currency: p.currency || 'USD'};
       });
     }
     if (key === 'rewards') {

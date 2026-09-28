@@ -72,7 +72,7 @@ docs/AVANCES_SURF_SALVAJE.md este documento
 
 - `npm start` (en `servidor/`) arranca todo y muestra el estado:
   `Surf Salvaje (protocolo v3): http://localhost:3000` y
-  `Cuentas: Google activo|sin configurar · Discord activo|sin configurar · pagos reales deshabilitados`.
+  `Cuentas: Google activo|sin configurar · Discord activo|sin configurar · PayPal activo (sandbox|live, webhook)|sin configurar`.
 - Lee `servidor/.env` si existe (`process.loadEnvFile`).
 - Rutas nuevas (todas responden JSON con `Cache-Control: no-store`):
 
@@ -87,8 +87,9 @@ docs/AVANCES_SURF_SALVAJE.md este documento
 | `POST /api/shop/purchase` · `/api/shop/equip` | Comprar (Tablas Normales) / equipar | sí | sí |
 | `GET /api/wallet/transactions` | Historial | sí | — |
 | `GET /api/coins/packages` · `POST /api/coins/exchange` | Paquetes Oro→Normales y cambio | exchange: sí | sí |
-| `GET /api/payments/products` · `POST /api/payments/checkout` | Productos de oro / pago (deshabilitado: 503) | — / sí | sí |
-| `POST /api/payments/webhook/:provider` | Reservado para el proveedor de pagos (501) | — | firma (pendiente) |
+| `GET /api/payments/products` · `POST /api/payments/checkout` · `GET /api/payments/orders/:id` | Paquetes de oro con precio / crear orden de PayPal / estado de mi orden (503 sin credenciales) | — / sí / sí | sí |
+| `GET /api/payments/paypal/return` · `/cancel` | Vuelta de PayPal: el servidor cobra y comprueba la orden | — | — |
+| `POST /api/payments/webhook/paypal` | Eventos de PayPal (503 sin `PAYPAL_WEBHOOK_ID`; otros proveedores 501) | — | firma verificada con PayPal |
 | `GET /api/trade/summary` · `/inventory` · `/user?code=` · `/offers?box=received\|sent\|history` · `/blocked` | Trade: código propio y ofertas pendientes, items intercambiables, buscar surfista, listados, bloqueados | sí | — |
 | `POST /api/trade/offers` · `/accept` · `/decline` · `/cancel` · `/block` · `/unblock` | Trade: crear (o contraofertar, o negociar una publicación con `listingId`), aceptar, rechazar, cancelar, bloquear | sí | sí |
 | `GET /api/trade/listings[?mine=1]` · `POST /api/trade/listings` · `POST /api/trade/listings/withdraw` | Trades públicos: tablón, publicar, retirar | sí | POST: sí |
@@ -263,17 +264,69 @@ Estados en la tienda: **COMPRAR · EQUIPAR · EQUIPADO · SALDO INSUFICIENTE** (
 **IMPLEMENTADO · PROBADO.** Pestaña **Conseguir monedas** de La tiendita. `POST /api/coins/exchange {packageId, requestId}`: descuenta el oro y acredita las Normales en la **misma transacción**, es idempotente y deja dos movimientos `GOLD_EXCHANGE` con la misma referencia.
 Paquetes en `config/economy.json → exchangePackages`: Pequeño 500, Mediano 1.500 y Grande 5.000 Tablas Normales. **Los precios en oro están en `null` (sin definir) y por eso los paquetes salen como "PRÓXIMAMENTE"**. Para activarlos, pon `goldPrice` y reinicia.
 
-## 19. Pagos reales
+## 19. Pagos reales · Tablas de Oro con PayPal
 
-**PREPARADO · DESHABILITADO · BLOQUEADO POR CONFIGURACIÓN EXTERNA.**
-- Hecho: tablas `payment_products` (en `config/economy.json → goldProducts`, sin precio e inactivos), `payment_orders` (estados CREATED, PENDING, PAID, CREDITED, FAILED, CANCELED, REFUNDED, CHARGEBACK), `payment_events` (idempotencia por id de evento) y `creditPaidOrder()` (acredita una sola vez una orden PAID).
-- `POST /api/payments/checkout` → 503 `payments_disabled`. `POST /api/payments/webhook/:provider` → 501 (no acredita nada).
-- **Pendiente para activar:**
-  1. Elegir un proveedor que opere en tu país (p. ej. Stripe, Mercado Pago o PayPal) y crear la cuenta.
-  2. Checkout en el servidor: crea `payment_orders` con precio del servidor y redirige al pago del proveedor.
-  3. Webhook con **verificación de firma**: registrar el evento en `payment_events`, marcar la orden PAID y llamar a `creditPaidOrder`. **Nunca acreditar por volver a una URL de éxito.**
-  4. Reembolsos y contracargos: política de saldo (el oro ya gastado no puede dejar el saldo negativo).
-  5. Aspectos legales: precios con impuestos, términos y condiciones, edad mínima.
+**IMPLEMENTADO · PROBADO con PayPal simulado · BLOQUEADO POR CONFIGURACIÓN EXTERNA** (hacen falta las credenciales de PayPal y poner precios).
+
+Qué se compra: **Tablas de Oro** (en USD). Después el jugador las cambia por Tablas Normales en la misma pestaña (sección 18), y con estas compra en La tiendita.
+
+**Flujo:** el servidor decide el precio y es el único que acredita.
+1. `POST /api/payments/checkout {productId}` (sesión + CSRF):
+   - crea `payment_orders` (CREATED) con el precio de `payment_products`;
+   - crea la orden en PayPal (Orders v2, `intent: CAPTURE`, `custom_id`/`invoice_id` = id de nuestra orden);
+   - devuelve la URL de aprobación, y la orden pasa a PENDING.
+   - Máximo 5 órdenes sin terminar por cuenta y hora.
+2. El jugador paga en PayPal y vuelve a `GET /api/payments/paypal/return?token=…`.
+   - **Volver no acredita nada por sí mismo.** El servidor pide a PayPal que **cobre** la orden.
+   - Solo si PayPal responde con una captura COMPLETED, con el importe y la divisa exactos, la orden pasa a PAID y `creditPaidOrder` acredita el oro una sola vez (CREDITED).
+   - Repetir la vuelta no vuelve a cobrar: `PayPal-Request-Id` y `ORDER_ALREADY_CAPTURED`.
+   - Si se cancela: `GET /api/payments/paypal/cancel` → CANCELED.
+   - El jugador vuelve a `/?pago=credited|pending|canceled|failed…&orden=…` y se abre La tiendita → Monedas con el resultado.
+3. **Webhook** `POST /api/payments/webhook/paypal`:
+   - la firma se verifica con la API de PayPal (`verify-webhook-signature` y `PAYPAL_WEBHOOK_ID`) antes de mirar el contenido;
+   - cada evento se guarda en `payment_events` (único por id), así que un reenvío no se procesa dos veces.
+
+| Evento de PayPal | Qué hace el servidor |
+|---|---|
+| `CHECKOUT.ORDER.APPROVED` | Cobra la orden (cubre al jugador que cierra el navegador tras aprobar) |
+| `PAYMENT.CAPTURE.COMPLETED` | Acredita el oro, igual que la vuelta y sin duplicar |
+| `PAYMENT.CAPTURE.DENIED` | Marca la orden FAILED |
+| `PAYMENT.CAPTURE.REFUNDED` | Marca REFUNDED y retira el oro de esa compra que quede (`GOLD_REFUND`), sin dejar el saldo negativo |
+| `PAYMENT.CAPTURE.REVERSED` | Igual que el reembolso, pero marca CHARGEBACK |
+
+- Lo ya cambiado por Tablas Normales no se recupera; queda anotado en el registro del servidor.
+- Archivos:
+  - `servidor/src/paypal.js`: cliente REST (token con caché, crear y cobrar orden, verificar webhook);
+  - `servidor/src/payments.js`: el flujo;
+  - rutas en `api.js`.
+- No hizo falta migración: las tablas `payment_*` ya existían en la 001.
+- Precios: `config/economy.json → goldProducts[].priceMinor`, en centavos (999 = 9.99 USD), o **/admin → Monedas**. Sin precio, el paquete sale como "PRÓXIMAMENTE". La divisa por defecto es USD.
+
+**Para activarlo (dueño):**
+1. En [developer.paypal.com](https://developer.paypal.com/dashboard/applications), crea una app REST.
+   - En **Sandbox**, para probar con cuentas de prueba sin dinero real.
+   - Después en **Live**.
+2. En `servidor/.env` pon `PAYPAL_ENV=sandbox` (o `live`), `PAYPAL_CLIENT_ID` y `PAYPAL_CLIENT_SECRET`. Al arrancar, el servidor dice `PayPal activo (sandbox, …)`.
+3. En la app de PayPal, **Add Webhook**:
+   - URL: `{PUBLIC_URL}/api/payments/webhook/paypal` (tiene que ser https y pública);
+   - eventos: los cinco de la tabla;
+   - copia el **Webhook ID** en `PAYPAL_WEBHOOK_ID`.
+4. Pon los precios de los tres paquetes en /admin → Monedas, y los `goldPrice` de los paquetes de cambio.
+5. Pendiente legal: precios con impuestos, términos y condiciones, edad mínima y política de reembolsos.
+
+**Pruebas:**
+- `test/paypal-payments.test.js`: 10 casos en SQLite y MariaDB, más el cliente REST:
+  - precio del servidor;
+  - la vuelta cobra y acredita una sola vez;
+  - importe o divisa distintos, PENDING y DECLINED no acreditan;
+  - cancelación;
+  - webhook sin firma rechazado, y reenvíos sin duplicar;
+  - orden aprobada sin vuelta;
+  - reembolso y contracargo sin saldo negativo;
+  - sin credenciales no se vende nada;
+  - límite de órdenes abiertas.
+- `auth-flow`: el webhook de PayPal sin credenciales da 503, y la vuelta sin orden no acredita.
+- **Navegador, con un PayPal simulado local:** clic en "Comprar con PayPal" → página de PayPal con 1.99 USD → Pagar → vuelta al juego con "¡Pago completado! +100 Tablas de Oro". En la base, la orden queda CREDITED y el monedero con +100. Después, el cambio de 50 de oro da +500 Tablas Normales.
 
 ## 20. Seguridad
 
@@ -532,6 +585,17 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
   - la pestaña "Conseguir monedas" pasa a llamarse **Monedas**;
   - **Hats** ya no dice "Pronto" y muestra los hats subidos desde el panel.
 
+## La tiendita → Monedas con PayPal y Perfil de tamaño fijo (2026-09-28)
+
+**IMPLEMENTADO · PROBADO en Chromium (1366×768, 1920×1080 y 390×844).**
+
+- **Monedas** (según la imagen de referencia): un selector con dos vistas de tres paquetes cada una.
+  - **Comprar Tablas de Oro** (PayPal): montón de monedas (`assets/images/currency/coins-small|medium|large.svg`), nombre, etiqueta **POPULAR / MEJOR VALOR / MÁXIMO**, cantidad y precio ("$9.99 USD" o "Precio por definir"). El botón **Comprar con PayPal** muestra debajo PAGO SEGURO / PRÓXIMAMENTE / INICIA SESIÓN. Abajo, la caja informativa "Conseguir Tablas de Oro".
+  - **Oro → Normales:** el cambio de siempre, con el mismo diseño y un botón dorado CAMBIAR (indica el coste en oro).
+  - Todo cabe sin scroll a 1366×768.
+- **Perfil:** antes crecía después de abrirse, al llegar el inventario y el historial (663 → 707 px a 1366×768; 823 → 915 px a 1920×1080). Ahora mide lo mismo que La tiendita desde el primer momento (1190×682). La escena 3D ocupa el alto libre y la columna derecha hace scroll por dentro.
+- **Trade:** pasa a 1190 px de ancho, como La tiendita. Mantiene su alto (hasta 780 px): a 680 px el botón "Enviar oferta" quedaba escondido bajo el scroll.
+
 ## 21. Archivos modificados (esta fase)
 
 - `client/index.html`: logo SVG, panel de acceso, botones de Google y Discord, datos con iconos, perfil y tienda (monedero, pestaña Conseguir monedas).
@@ -634,7 +698,7 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
 ## 26. Funciones pendientes
 
 - Probar Google y Discord con credenciales reales (checklist de la sección 27).
-- Integrar la pasarela de pago (sección 19).
+- Activar PayPal: credenciales, webhook y precios (sección 19).
 - Definir precios: `goldPrice` de los paquetes e `itemPrices` de los artículos que se vendan.
 - Hats reales (hoy solo existe `hat:0` = sin hat).
 - Misiones, logros y eventos como fuentes de Tablas Normales.
@@ -653,7 +717,7 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` y redirect URI | Google Cloud Console | BLOQUEADO (dueño) |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` y redirect | Discord Developer Portal | BLOQUEADO (dueño) |
 | `PUBLIC_URL` con dominio https + `SESSION_SECRET` + `NODE_ENV=production` | Servidor de producción | BLOQUEADO (dueño) |
-| Proveedor de pagos, credenciales y webhook | Proveedor elegido | BLOQUEADO (dueño) |
+| PayPal: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID` y precios de los paquetes | Integración hecha (sección 19) | BLOQUEADO (dueño) |
 | `DISCORD_INVITE_URL` (icono de Discord del inicio) | `servidor/.env` | PENDIENTE (dueño) |
 | Precios de artículos | `servidor/config/economy.json` | IMPLEMENTADO (2026-09-28, sección 16) |
 | Precios de paquetes Oro → Normales | `servidor/config/economy.json` | PENDIENTE (decisión de negocio) |
@@ -672,11 +736,17 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 
 1. Crear las credenciales de Google y Discord (secciones 8 y 9) y completar el checklist.
 2. Decidir precios y activar los paquetes de conversión.
-3. Elegir el proveedor de pagos e implementar checkout y webhook firmado.
+3. Configurar PayPal (sandbox → live), el webhook y los precios de los paquetes (sección 19).
 4. Añadir hats y los primeros artículos de pago.
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Compra de Tablas de Oro con PayPal y Perfil de tamaño fijo
+- PayPal (Orders v2) en el servidor: checkout con el precio del servidor, cobro confirmado con PayPal al volver, webhook firmado, reembolsos y contracargos. El oro se acredita una sola vez. Todo en USD.
+- La tiendita → Monedas rediseñada según la referencia, con "Comprar con PayPal" y el cambio a Tablas Normales.
+- El Perfil ya no se estira: mismo tamaño que La tiendita.
+- Falta configurar: credenciales de PayPal, webhook y precios (sección 19).
 
 ### 2026-09-28 · Causa real del frenazo al mantener A/D: repetición de teclas en pares
 - El equipo del jugador manda una tecla mantenida como pares keydown/keyup. Cada keyup soltaba la dirección. Ahora un keyup solo la suelta 150 ms después del último keydown. Reproducido en Chromium: antes no se movía; ahora se mueve igual que con la tecla mantenida.
