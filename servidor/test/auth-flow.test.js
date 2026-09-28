@@ -206,6 +206,10 @@ test('shop, exchange and admin credit go through the backend with CSRF and idemp
   // Pagos reales: deshabilitados, y el webhook no acredita nada.
   assert.equal((await a.post('/api/payments/checkout', {productId: 'gold_small'}, {csrf})).json.error, 'payments_disabled');
   assert.equal((await fetch(BASE + '/api/payments/webhook/stripe', {method: 'POST', body: '{"paid":true}'})).status, 501);
+  // PayPal sin credenciales: el webhook no acepta nada y volver de PayPal no acredita.
+  assert.equal((await fetch(BASE + '/api/payments/webhook/paypal', {method: 'POST', body: '{"event_type":"PAYMENT.CAPTURE.COMPLETED"}'})).status, 503);
+  const back = await fetch(BASE + '/api/payments/paypal/return?token=FAKE', {redirect: 'manual'});
+  assert.equal(back.headers.get('location'), '/?pago=unknown');
   assert.equal((await a.me()).wallet.GOLD_COIN, 10);
   const history = await (await a.get('/api/wallet/transactions')).json();
   assert.deepEqual(history.transactions.map(t => t.type), ['ITEM_PURCHASE', 'GOLD_EXCHANGE', 'GOLD_EXCHANGE', 'ADMIN_ADJUSTMENT']);

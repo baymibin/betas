@@ -109,16 +109,46 @@
 .shop-note:empty{display:none}
 .shop-empty-note{grid-column:1/-1;align-self:start;margin:4px 6px;font-size:13px;font-weight:700;color:#bcd8dd}
 .shop-no-hat{font-size:34px;color:#8fb4bd}
-.coins-panel{display:flex;flex-direction:column;gap:12px;padding:6px 14px 14px}
-.coins-panel h3{margin:6px 2px 0;font-size:15px;letter-spacing:1.5px;color:#9ff4e6}
-.coins-panel p{margin:0 2px;font-size:13px;color:#bcd8dd}
-.coin-pack{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px;border-radius:16px;background:#05344a99;border:1px solid #8feaf044}
-.coin-pack img{width:46px;height:46px}
-.coin-pack strong{display:block;font-size:16px}
-.coin-pack small{color:#bcd8dd}
-.coin-pack button{min-width:128px;padding:10px 14px;border-radius:12px;border:1px solid #fff0b0;background:linear-gradient(180deg,var(--gold-a),var(--gold-b));color:var(--ink-dark);font:800 14px 'Baloo 2',sans-serif;cursor:pointer}
-.coin-pack button:disabled{background:#ffffff1a;color:#cfe3e7;border-color:#ffffff33;cursor:not-allowed}
-.coin-pack.gold{border-color:#ffd25766}
+/* ---------- La tiendita → Monedas (referencia 2026-09-28): paquetes con PayPal ---------- */
+.coins-panel{display:flex;flex-direction:column;gap:7px;padding:0 2px 0 10px}
+.coins-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;border-radius:14px;background:#04263699;border:1px solid #8feaf033}
+.coins-switch button{display:flex;align-items:center;justify-content:center;gap:6px;padding:5px 8px;border:0;border-radius:10px;background:transparent;color:#cfe8ee;font:800 12px 'Baloo 2',sans-serif;letter-spacing:.3px;cursor:pointer;white-space:nowrap}
+.coins-switch button img{width:18px;height:18px}
+.coins-switch [aria-selected=true]{background:linear-gradient(180deg,#136a80,#0b4b5e);color:#fff;box-shadow:inset 0 0 0 1px #8feaf077,0 3px 10px #00141f66}
+.coins-box{display:flex;flex-direction:column;gap:6px;padding:9px 10px 10px;border-radius:18px;background:linear-gradient(160deg,#07384dcc,#052b3dcc);border:1px solid #8feaf04d;box-shadow:inset 0 1px 0 #ffffff14}
+.coins-box h3{margin:0 2px;font-size:15px;letter-spacing:1.6px;color:#8ff5e8;font-weight:900}
+.coins-box h3 span{color:#ffd66b;margin:0 4px}
+.coins-box>p{margin:-3px 2px 2px;font-size:12px;color:#bcd8dd}
+.coin-list{display:grid;gap:6px}
+.coin-pack{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px 6px 6px;border-radius:16px;background:linear-gradient(110deg,#0a4257d9,#07344ad9);border:1px solid #8feaf040;box-shadow:inset 0 1px 0 #ffffff12}
+.coin-art{display:grid;place-items:center;height:56px;border-radius:12px;background:radial-gradient(circle at 50% 60%,#ffd24a33,#06293800 70%),#062b3c;border:1px solid #ffd76a2e}
+.coin-art img{width:64px;height:50px;object-fit:contain}
+.coin-text{display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:0;min-width:0}
+.coin-text strong{font-size:13px;letter-spacing:-.1px;color:#fff;white-space:nowrap}
+.coin-text small{flex:1 0 100%;font-size:12px;line-height:1.3;color:#cfe3e7}
+.coin-text .coin-price{color:#e8f6f8;font-weight:700}
+.coin-badge{justify-self:start;display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:999px;font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.3px;white-space:nowrap}
+.coin-badge i{font-style:normal;font-size:10px}
+.coin-badge.popular{color:#9ff4ff;background:#0b5a70;border:1px solid #6fe3f7aa}
+.coin-badge.value{color:#ffd48a;background:#5a3a0e;border:1px solid #ffb54a99}
+.coin-badge.max{color:#e8c8ff;background:#43205f;border:1px solid #c38cff99}
+.paypal-btn,.exchange-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-width:0;height:46px;padding:3px 9px;border-radius:12px;cursor:pointer;font-family:'Baloo 2',sans-serif}
+.paypal-btn{border:1px solid #ffffffcc;background:linear-gradient(180deg,#e6f5ff,#a9dcff);box-shadow:0 0 16px #7fd3ff66,inset 0 1px 0 #fff}
+.paypal-btn .pp-line{display:flex;align-items:center;gap:5px;color:#0b3a73;font-size:12.5px;font-weight:700;white-space:nowrap}
+.paypal-btn .pp-mark{width:15px;height:18px}
+.paypal-btn b{font-size:15.5px;font-style:italic;font-weight:900;color:#009cde;letter-spacing:-.3px}.paypal-btn b i{color:#003087}
+.paypal-btn small{font-size:8.5px;font-weight:900;letter-spacing:1.4px;color:#46708f}
+.paypal-btn:not(:disabled):hover{filter:brightness(1.06);box-shadow:0 0 22px #9ddfff99,inset 0 1px 0 #fff}
+.paypal-btn:disabled{cursor:not-allowed;opacity:.92}
+.exchange-btn{min-width:128px;border:1px solid #fff0b0;background:linear-gradient(180deg,var(--gold-a),var(--gold-b));color:var(--ink-dark);font-weight:900;font-size:14px;letter-spacing:.5px}
+.exchange-btn small{display:inline-flex;align-items:center;gap:3px;font-size:10px;letter-spacing:.6px}.exchange-btn small img{width:14px;height:14px}
+.exchange-btn:disabled{background:#ffffff1a;color:#cfe3e7;border-color:#ffffff33;cursor:not-allowed}
+.coins-info{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:7px 12px;border-radius:14px;background:#05293acc;border:1px solid #8feaf040}
+.coins-info>i{display:grid;place-items:center;width:20px;height:20px;margin-top:2px;border-radius:50%;border:2px solid #8ff5e8;color:#8ff5e8;font:900 12px/1 Georgia,serif;font-style:normal}
+.coins-info strong{display:block;font-size:13px;letter-spacing:1.3px;color:#8ff5e8}
+.coins-info p{margin:1px 0 0;font-size:11.5px;line-height:1.35;color:#d5e9ed}.coins-info p b{color:#fff}.coins-info p em{color:#ffd66b;font-style:normal}
+@media(max-width:540px){.coins-switch button{font-size:11px;gap:4px;padding:5px 4px}.coins-switch button img{width:14px;height:14px}}
+@media(max-width:700px){.coin-pack{grid-template-columns:64px 1fr;gap:10px}.coin-art{height:52px}.coin-art img{width:60px;height:46px}.paypal-btn,.exchange-btn{grid-column:1/-1;min-width:0;width:100%}}
 
 /* El Perfil tiene su propia hoja: styles/profile.css */
 
@@ -131,8 +161,8 @@
 .shop-tabs{grid-template-columns:repeat(4,minmax(0,1fr)) minmax(0,1.45fr)}
 .shop-tabs button{font-size:12px;gap:5px;padding:10px 4px;overflow:hidden;text-overflow:ellipsis}
 #shop-grid .coins-panel{grid-column:1/-1}
-#coin-packs,#gold-products{display:grid;gap:10px}
-.coin-pack .coin-inline img{width:18px;height:18px}.coin-pack .coin-inline{vertical-align:middle}
+#shop-grid:has(.coins-panel){padding-right:6px}
+.coin-pack .coin-inline img{width:16px;height:16px}.coin-pack .coin-inline{vertical-align:middle}
 
 /* ---------- Inicio (2026-09-28): caja de JUGAR con dos botones y acceso abajo a la izquierda ---------- */
 .play-actions{display:flex;gap:10px;margin-top:14px}

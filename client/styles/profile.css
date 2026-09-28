@@ -177,3 +177,26 @@
   .profile-shop-btn,.profile-secondary{height:48px;font-size:18px}.profile-footer{padding-top:10px;gap:5px}
 }
 @media (max-width:900px){.profile-right.is-guest{padding-top:0}.profile-kicker,.profile-title{padding-right:56px}.profile-identity p{white-space:normal;text-align:center}}
+
+/* ---------- Tamaño fijo, igual que La tiendita (2026-09-28) ----------
+   Antes el modal crecía al llegar los datos de la cuenta (inventario, historial) y se "estiraba"
+   después de abrirse. En escritorio mide lo mismo que La tiendita (1190 × 680 px como máximo) desde
+   el primer momento: la escena 3D ocupa el alto libre de la columna izquierda y la columna derecha
+   hace scroll por dentro si no cabe todo. */
+.profile-dialog{width:min(1190px,96vw)}
+@media (min-width:901px){
+  .profile-shell{height:min(680px,91dvh);overflow:hidden;padding:18px 24px 12px;gap:10px}
+  .profile-layout{flex:1 1 auto;min-height:0;align-items:stretch}
+  .profile-left{min-height:0}
+  .profile-stage{flex:1 1 auto;height:auto;min-height:200px}
+  .profile-title{font-size:36px;margin-bottom:6px}
+  .profile-avatar{width:62px;height:62px}.profile-nick-card{margin-top:10px;padding:10px 14px}
+  .profile-right{min-height:0;overflow-y:auto;gap:8px;padding-right:6px;scrollbar-width:thin;scrollbar-color:#57e3ee55 transparent}
+  .profile-right.is-guest{padding-top:38px}
+  .pf-card{padding:12px 14px}.pf-guest{padding:18px 20px;gap:10px}.pf-provider-btn{height:52px}
+  .pf-benefit{padding:10px 8px}.pf-benefit svg{width:44px;height:44px}
+  .pf-eq-art{height:60px}.pf-eq-art svg{height:58px}.pf-eq-art img{max-height:58px}
+  .pf-history{max-height:none;overflow:visible}
+  .profile-footer{flex:none}
+  .profile-shop-btn,.profile-secondary{height:52px;font-size:19px}
+}

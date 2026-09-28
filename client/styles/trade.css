@@ -1,7 +1,7 @@
 /* Surf Salvaje · Trade. Mismos tokens que La tiendita, el Perfil y Ajustes: cristal azul petróleo,
    borde turquesa y dorado. Tres columnas: tus items · nuevo trade · vista del item. */
 .trade-dialog{--tr-cyan:#57e3ee;--tr-gold:#ffd46b;--tr-text2:#b8d4df;--tr-line:#8feaf055;--tr-card:linear-gradient(160deg,#05344acc,#03263ad9);
-  width:min(96vw,1180px);max-width:none;max-height:94dvh;padding:0;border:1px solid #b8f3ff78;border-radius:26px;overflow:hidden;
+  width:min(96vw,1190px);max-width:none;max-height:94dvh;padding:0;border:1px solid #b8f3ff78;border-radius:26px;overflow:hidden;
   background:#082e3b;color:#f6ffff;font-family:'Baloo 2',sans-serif;box-shadow:0 26px 90px #00131dbb,inset 0 0 0 1px #ffffff25}
 .trade-dialog::backdrop{background:linear-gradient(#001d2c73,#001725a6),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;backdrop-filter:blur(7px) saturate(.9)}
 .trade-shell{position:relative;max-height:94dvh;overflow:auto;box-sizing:border-box;padding:22px 26px 20px;display:flex;flex-direction:column;gap:14px;
