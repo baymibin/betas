@@ -1608,7 +1608,7 @@ function clearPracticeBots(){practiceBots=[];practiceFinish=0;for(const [id,mesh
 // Estado visual de los bots del solitario, interpolado entre ticks de simulación (30 Hz).
 function practiceBotStates(alpha){return practiceBots.map(({player:p,prev})=>({...p,x:prev.x+(p.x-prev.x)*alpha,y:prev.y+(p.y-prev.y)*alpha,z:prev.z+(p.z-prev.z)*alpha}));}
 function practiceField(){return [{...localPlayer,character:profile.character,board:profile.board,wing:profile.wing,hat:profile.hat|0,nick:profile.nick||'Tú'},...practiceBots.map(b=>b.player)];}
-window.__surfDebug = { getPlayer: () => localPlayer, getWorld: () => localPowerWorld, getBots: () => practiceBots };
+window.__surfDebug = { getPlayer: () => localPlayer, getWorld: () => localPowerWorld, getBots: () => practiceBots, getNet: () => net };
 let worldArt=null,activeMapId=-1;
 let courseView,trackView,mapObjects=[],mapMaterials=[];
 function buildMap(id){
@@ -1766,8 +1766,8 @@ window.addEventListener('keydown', function(e){
   }
   if(!running || isPaused) return;
   switch(e.key){
-    case 'ArrowLeft': case 'a': case 'A': keyState.left = true; e.preventDefault(); break;
-    case 'ArrowRight': case 'd': case 'D': keyState.right = true; e.preventDefault(); break;
+    case 'ArrowLeft': case 'a': case 'A': keyState.left = true; anchorMouse(); e.preventDefault(); break;
+    case 'ArrowRight': case 'd': case 'D': keyState.right = true; anchorMouse(); e.preventDefault(); break;
     case ' ': if(!e.repeat&&!spaceHeld)doJump(); spaceHeld=true; e.preventDefault(); break;
     case 'e': case 'E': if(!e.repeat){if(online)net.buttons|=4;else localButtons|=4;}e.preventDefault();break;
     case 'Shift': case 'ShiftLeft': case 'ShiftRight': boostHeld=true; e.preventDefault(); break;
@@ -1781,17 +1781,22 @@ window.addEventListener('keyup', function(e){
     case ' ': spaceHeld=false; break;
     case 'Shift': case 'ShiftLeft': case 'ShiftRight': boostHeld=false; net.boostHeld=false; break;
     case 'ArrowUp': case 'w': case 'W': throttleHeld=false; if(net)net.throttleHeld=false; break;
-    case 'ArrowLeft': case 'a': case 'A': keyState.left = false; break;
-    case 'ArrowRight': case 'd': case 'D': keyState.right = false; break;
+    case 'ArrowLeft': case 'a': case 'A': keyState.left = false; anchorMouse(); break;
+    case 'ArrowRight': case 'd': case 'D': keyState.right = false; anchorMouse(); break;
   }
 });
 
-// Solo cuenta como dirigir con el ratón si el puntero se ha movido de verdad (el navegador
-// lanza mousemove sin movimiento cuando cambia lo que hay debajo del cursor).
-let lastMouseX=null;
+// Solo cuenta como dirigir con el ratón un movimiento claro del puntero: al menos
+// MOUSE_STEER_PX en horizontal desde donde estaba al usar el teclado por última vez. Así un
+// mousemove sin movimiento (el navegador los lanza cuando cambia lo que hay bajo el cursor) o
+// el temblor de un touchpad o de un ratón apoyado no quitan el control al teclado.
+const MOUSE_STEER_PX=24;
+let mouseAnchorX=null;
+function anchorMouse(){mouseAnchorX=null;lastMouseMoveT=-10;}
 window.addEventListener('mousemove', function(e){
-  if(e.clientX===lastMouseX)return;
-  lastMouseX=e.clientX;
+  if(mouseAnchorX===null)mouseAnchorX=e.clientX;
+  if(Math.abs(e.clientX-mouseAnchorX)<MOUSE_STEER_PX&&(elapsed-lastMouseMoveT)>=.22)return;
+  mouseAnchorX=e.clientX;
   mouseNormX = (e.clientX / window.innerWidth) * 2 - 1;
   lastMouseMoveT = elapsed;
 });
