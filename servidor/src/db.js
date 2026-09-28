@@ -12,7 +12,7 @@
 import {readFileSync, readdirSync, mkdirSync} from 'node:fs';
 import {dirname, resolve, isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {catalogItems} from '../../client/src/shared/catalog.js';
+import {catalogItems, applyCustomItems, applyItemTexts} from '../../client/src/shared/catalog.js';
 
 const serverRoot = fileURLToPath(new URL('../', import.meta.url));
 const DEFAULT_URL = 'file:./data/surf-salvaje.db';
@@ -166,9 +166,38 @@ export function loadEconomyConfig(path = process.env.ECONOMY_CONFIG || resolve(s
   return config;
 }
 
+// Cambios hechos desde el panel administrativo, guardados en la base de datos:
+//  - custom_items: tablas/wings/hats subidos, que se añaden al final del catálogo compartido;
+//  - item_overrides: precio, rareza, textos y "a la venta" de cualquier item;
+//  - economy_overrides: paquetes de monedas, productos de oro y recompensas.
+// Se vuelcan sobre `config` (el mismo objeto que usan la economía y el trade), por encima de
+// economy.json. config.customItems y config.itemTexts se publican en /api/catalog/custom.
+export async function applyCustomizations(db, config) {
+  const custom = (await db.all('SELECT id, category, asset_index AS assetIndex, name, description, file, full_file AS fullFile, color, width FROM custom_items ORDER BY category, asset_index'))
+    .map(row => ({...row, assetIndex: Number(row.assetIndex), width: row.width === null ? null : Number(row.width)}));
+  applyCustomItems(custom);
+  config.customItems = custom;
+  config.itemPrices = {...(config.itemPrices || {})};
+  config.itemRarity = {...(config.itemRarity || {})};
+  const notForSale = new Set(), texts = [];
+  for (const o of await db.all('SELECT item_id, price_normal, rarity, name, description, for_sale FROM item_overrides')) {
+    if (o.price_normal !== null && o.price_normal !== undefined) config.itemPrices[o.item_id] = Number(o.price_normal);
+    if (o.rarity) config.itemRarity[o.item_id] = o.rarity;
+    if (o.for_sale !== null && o.for_sale !== undefined && !Number(o.for_sale)) notForSale.add(o.item_id);
+    if (o.name || o.description) texts.push({id: o.item_id, name: o.name || null, description: o.description || null});
+  }
+  applyItemTexts(texts);
+  config.itemTexts = texts;
+  config.notForSale = [...notForSale];
+  for (const row of await db.all('SELECT `key` AS k, value_json FROM economy_overrides')) {
+    try { config[row.k] = JSON.parse(row.value_json); } catch {}
+  }
+}
+
 // Aplica la configuración: crea o actualiza artículos y paquetes. Lo que desaparece de la
 // configuración no se borra (hay inventarios y compras que lo referencian): se desactiva.
 export async function syncCatalog(db, config) {
+  await applyCustomizations(db, config);
   const prices = config.itemPrices || {};
   await db.tx(async t => {
     const items = catalogItems();

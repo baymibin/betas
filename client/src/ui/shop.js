@@ -1,19 +1,20 @@
+import '../core/catalog-remote.js';   // primero: items subidos desde el panel (ver ese módulo)
 import {previewSvg} from '../characters/stick-avatar.js';
 import {boardSkins} from '../shared/board-cosmetics.js';
 import {createShopPreview} from './shop-preview.js';
 import * as accountApi from '../account/account.js';
 import {account,COIN_ICONS,COIN_NAMES,formatCoins,message} from '../account/account.js';
 
-import {characters,boards,wings,wingFiles,descriptions} from '../shared/catalog.js';
-export {characters,boards,wings,wingFiles};
+import {characters,boards,wings,wingFiles,hats,hatUrl,wingUrl,descriptions} from '../shared/catalog.js';
+export {characters,boards,wings,wingFiles,hats};
 
 const key='surf.profile.v1';
-export const profile={nick:'',character:0,board:0,wing:0};
+export const profile={nick:'',character:0,board:0,wing:0,hat:0};
 try{
   const saved=JSON.parse(localStorage.getItem(key)||'{}');
   profile.nick=typeof saved.nick==='string'?saved.nick.slice(0,16):'';
-  for(const field of ['character','board','wing']){
-    const limit=field==='wing'?wings.length:field==='board'?boards.length:characters.length;
+  for(const field of ['character','board','wing','hat']){
+    const limit=field==='wing'?wings.length:field==='board'?boards.length:field==='hat'?hats.length:characters.length;
     if(Number.isInteger(saved[field])&&saved[field]>=0&&saved[field]<limit)profile[field]=saved[field];
   }
 }catch{}
@@ -35,7 +36,7 @@ const coinsIcon=c=>`<img src="${COIN_ICONS[c]}" alt="${COIN_NAMES[c]}">`;
 async function loadCatalog(){
   try{const {items}=await accountApi.catalog();serverItems=new Map(items.map(i=>[i.id,i]));}catch{serverItems=new Map();}
 }
-const slotOf=()=>category==='wings'?'wing':category;
+const slotOf=()=>category==='wings'?'wing':category==='hats'?'hat':category;
 function itemState(slot,id){
   const info=serverItems.get(slot+':'+id)||{price:0,free:true,owned:true};
   const equipped=profile[slot]===id;
@@ -68,9 +69,9 @@ async function act(slot,id){
   }catch(e){note=message(e.code);if(e.code==='insufficient_funds'||e.code==='already_owned')await loadCatalog();}
   finally{busy=false;render();}
 }
-function itemName(slot,id){return slot==='wing'?`${wings[id]} Wings`:slot==='board'?boards[id]:characters[id];}
+function itemName(slot,id){return slot==='wing'?`${wings[id]} Wings`:slot==='board'?boards[id]:slot==='hat'?hats[id]:characters[id];}
 async function renderCoins(){
-  detailName.textContent='Conseguir monedas';detailRarity.textContent='MONEDERO';
+  detailName.textContent='Monedas';detailRarity.textContent='MONEDERO';
   detailDescription.textContent='Las Tablas de Oro se cambian por Tablas Normales. En La tiendita todo se compra con Tablas Normales.';
   detailEquip.textContent='TABLAS NORMALES';detailEquip.disabled=true;
   const panel=document.createElement('div');panel.className='coins-panel';
@@ -102,7 +103,7 @@ async function renderCoins(){
     panel.querySelector('#gold-products').innerHTML=products.map(p=>`<div class="coin-pack gold">${coinsIcon('GOLD_COIN')}<div><strong>${p.name.toUpperCase()}</strong><small>${formatCoins(p.goldAmount)} Tablas de Oro</small></div><button type="button" disabled>PRÓXIMAMENTE</button></div>`).join('');
   }catch{panel.querySelector('#gold-status').textContent='';}
 }
-let category='character',opener,selected={character:profile.character,board:profile.board,wing:profile.wing};
+let category='character',opener,selected={character:profile.character,board:profile.board,wing:profile.wing,hat:profile.hat|0};
 const categoryField=slotOf;
 function render(){
   const scroll=grid.scrollTop;
@@ -111,17 +112,10 @@ function render(){
   const noteEl=document.getElementById('shop-note');if(noteEl)noteEl.textContent=note;
   document.querySelectorAll('#shop-dialog [data-category]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.category===category)));
   if(category==='coins'){renderCoins();return;}
-  if(category==='hats'){
-    const p=document.createElement('p');p.className='coming-soon';
-    p.innerHTML='<strong>Sombreros · Muy pronto</strong><br>El espacio ya está preparado para añadir hats sin cambiar la tienda.';
-    grid.append(p);
-    detailName.textContent='Hats · Pronto';detailRarity.textContent='PRÓXIMAMENTE';
-    detailDescription.textContent='Gorras y sombreros de playa llegarán a Surf Club.';
-    detailEquip.textContent='PRONTO';detailEquip.disabled=true;detailEquip.className='';return;
-  }
-  const prop=categoryField(),list=prop==='wing'?wings:prop==='board'?boards:characters,chosen=selected[prop];
+  const prop=categoryField(),list=prop==='wing'?wings:prop==='board'?boards:prop==='hat'?hats:characters,chosen=selected[prop]|0;
   list.forEach((name,id)=>{
     const st=itemState(prop,id);
+    if(st.forSale===false&&!st.owned&&!st.free)return;   // retirado de la venta desde el panel (quien lo tiene lo conserva)
     const card=document.createElement('div');
     card.className=`shop-item${chosen===id?' is-selected':''}${st.equipped?' is-equipped':''}${st.usable?'':' is-locked'}`;
     const select=document.createElement('button');select.type='button';select.className='shop-item-select';
@@ -130,7 +124,10 @@ function render(){
     const art=document.createElement('span');art.className='shop-item-art';
     if(prop==='wing'){
       art.classList.add('wing-preview');
-      art.style.backgroundImage=`url('/assets/images/wings/${wingFiles[id]}')`;
+      art.style.backgroundImage=`url('${wingUrl(id)}')`;
+    }else if(prop==='hat'){
+      if(hatUrl(id)){const image=document.createElement('img');image.src=hatUrl(id);image.alt='';art.append(image);}
+      else art.innerHTML='<span class="shop-no-hat" aria-hidden="true">∅</span>';
     }else if(prop==='board'){
       const image=document.createElement('img');image.src=boardSkins[id].file;image.alt='';art.append(image);
     }else art.innerHTML=previewSvg(id,id);
@@ -149,6 +146,8 @@ function render(){
     action.onclick=()=>act(prop,id);
     card.append(select,action);grid.append(card);
   });
+  // Hats: "Sin hat" (gratis) más los que se suban desde el panel administrativo.
+  if(prop==='hat'&&hats.length<2){const p=document.createElement('p');p.className='shop-empty-note';p.textContent='Aún no hay más hats: cuando se añadan aparecerán aquí.';grid.append(p);}
   grid.scrollTop=scroll;
   const st=itemState(prop,chosen);
   detailName.textContent=itemName(prop,chosen);
@@ -158,10 +157,10 @@ function render(){
   detailEquip.className=st.action==='buy'||st.action==='login'?'is-buy':st.action==='poor'?'is-poor':'';
   detailEquip.disabled=st.equipped||busy;
 }
-detailEquip.onclick=()=>{if(category!=='hats'&&category!=='coins')act(categoryField(),selected[categoryField()]);};
+detailEquip.onclick=()=>{if(category!=='coins')act(categoryField(),selected[categoryField()]|0);};
 document.getElementById('shop-btn').onclick=async()=>{
   opener=document.activeElement;note='';
-  selected={character:profile.character,board:profile.board,wing:profile.wing};
+  selected={character:profile.character,board:profile.board,wing:profile.wing,hat:profile.hat|0};
   category='character';dialog.showModal();render();preview.open(selected);
   await loadCatalog();if(dialog.open)render();
 };

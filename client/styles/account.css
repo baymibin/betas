@@ -107,9 +107,11 @@
 #shop-detail-equip.is-poor{background:#4a2129;color:#ffd0c4}
 .shop-note{margin:6px 0 0;font-size:12px;color:#ffb9a3;min-height:0}
 .shop-note:empty{display:none}
-.coins-panel{display:flex;flex-direction:column;gap:12px}
-.coins-panel h3{margin:4px 0 0;font-size:15px;letter-spacing:1.5px;color:#9ff4e6}
-.coins-panel p{margin:0;font-size:13px;color:#bcd8dd}
+.shop-empty-note{grid-column:1/-1;align-self:start;margin:4px 6px;font-size:13px;font-weight:700;color:#bcd8dd}
+.shop-no-hat{font-size:34px;color:#8fb4bd}
+.coins-panel{display:flex;flex-direction:column;gap:12px;padding:6px 14px 14px}
+.coins-panel h3{margin:6px 2px 0;font-size:15px;letter-spacing:1.5px;color:#9ff4e6}
+.coins-panel p{margin:0 2px;font-size:13px;color:#bcd8dd}
 .coin-pack{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px;border-radius:16px;background:#05344a99;border:1px solid #8feaf044}
 .coin-pack img{width:46px;height:46px}
 .coin-pack strong{display:block;font-size:16px}

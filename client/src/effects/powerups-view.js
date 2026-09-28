@@ -243,7 +243,7 @@ export function createPowerView(B, scene, use) {
   });
 
   const entities = new Map();
-  let taken = new Set(), locallyTaken = new Set(), lastItem = 0, rouletteUntil = 0, lastTime = 0, shown = -1;
+  let taken = new Set(), locallyTaken = new Set(), lastItem = 0, lastTime = 0, shown = null;
   let lastTimerHtml='',lastWarning='';
   const visibleBoxes=[],live=new Set();
 
@@ -355,8 +355,7 @@ export function createPowerView(B, scene, use) {
       taken = new Set();
       locallyTaken = new Set();
       lastItem = 0;
-      shown = -1;
-      rouletteUntil = 0;
+      shown = null;
       burst = null;
       lastTimerHtml='';lastWarning='';lastTime=0;
       hide();
@@ -420,11 +419,11 @@ export function createPowerView(B, scene, use) {
       });
 
       // Ability Roulette & Display
-      if (p.heldItem && p.heldItem !== lastItem) rouletteUntil = time + 0.65;
+      // La ruleta la decide la simulación (p.itemRoll, igual en servidor y práctica): gira
+      // hasta que se agota o se pulsa E; solo entonces el poder queda listo para usarse.
       lastItem = p.heldItem;
-
-      const rolling = time < rouletteUntil && p.heldItem;
-      const kind = rolling ? 1 + Math.floor(time * 18) % 8 : p.heldItem;
+      const rolling = !!p.heldItem && p.itemRoll > 0;
+      const kind = rolling ? 1 + Math.floor(time * 12) % 8 : p.heldItem;
       const isPending = !!p.heldItem;
 
       if(hud.hidden===isPending)hud.hidden=!isPending;
@@ -433,11 +432,12 @@ export function createPowerView(B, scene, use) {
         if(button.className!==buttonClass)button.className=buttonClass;
         const item = ITEMS[kind] || 'Caja misteriosa';
         const iconSrc = kind ? iconCache[kind - 1].src : '/assets/images/powerups/power-cube-holo.webp';
-        if (shown !== kind) {
-          itemName.textContent = item;
-          itemHint.textContent = rolling ? 'Eligiendo poder...' : 'E para usar';
+        const key = rolling ? -kind : kind;
+        if (shown !== key) {
+          itemName.textContent = rolling ? 'Ruleta de poderes' : item;
+          itemHint.textContent = rolling ? 'E para parar la ruleta' : 'E para usar';
           icon.src = iconSrc;
-          shown = kind;
+          shown = key;
         }
       }
 

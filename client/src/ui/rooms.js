@@ -330,6 +330,7 @@ export function createRoomUI(net, profile, onRace) {
   let selectedMapId = 0, selectedCapacity = 8, selectedPrivate = false;
   let selectedBotsOn = false, selectedBots = 3;   // bots opcionales: solo si el anfitrión los activa
   let pendingBots = 0;                             // bots pedidos al crear (para avisar si el servidor no los admite)
+  let copyTimer = 0;                               // "¡Copiado!" del código en la sala de espera
 
   function stop() {
     clearInterval(timer);
@@ -500,7 +501,7 @@ export function createRoomUI(net, profile, onRace) {
             <div class="mp-field-group cp-code">
               <label class="mp-field-label" for="create-room-code">Código de sala (6 números)</label>
               <!-- El servidor asigna el código real al crear la sala; aquí no existe todavía. -->
-              <input type="text" id="create-room-code" class="cp-code-input" maxlength="6" inputmode="numeric" placeholder="Se asigna al crear la sala" value="" readonly aria-readonly="true" tabindex="-1">
+              <input type="text" id="create-room-code" class="cp-code-input" maxlength="6" inputmode="numeric" placeholder="${selectedPrivate ? 'Privada: solo se entra con el código' : 'Se asigna al crear la sala'}" value="" readonly aria-readonly="true" tabindex="-1">
             </div>
 
             <button type="button" id="create-now" class="mp-btn-action-primary cp-create-btn">
@@ -596,6 +597,8 @@ export function createRoomUI(net, profile, onRace) {
       const privToggle = root.querySelector('#room-private-toggle');
       privToggle.onchange = () => {
         selectedPrivate = privToggle.checked;
+        // Privada: no sale en Buscar salas; solo se entra con el código que se asigna al crearla.
+        root.querySelector('#create-room-code').placeholder = selectedPrivate ? 'Privada: solo se entra con el código' : 'Se asigna al crear la sala';
       };
 
       // Create room button
@@ -608,7 +611,8 @@ export function createRoomUI(net, profile, onRace) {
           mode: 1,
           mapId: selectedMapId,
           capacity: selectedCapacity,
-          bots: selectedBotsOn ? Math.min(selectedBots, selectedCapacity - 1) : 0
+          bots: selectedBotsOn ? Math.min(selectedBots, selectedCapacity - 1) : 0,
+          private: selectedPrivate
         });
       };
 
@@ -1078,14 +1082,14 @@ export function createRoomUI(net, profile, onRace) {
 
     root.querySelector('.room-close').onclick = () => form('browse');
 
+    // Un solo temporizador para el "¡Copiado!": antes cada clic guardaba como texto original el
+    // que hubiera en ese momento, y con dos clics seguidos el aviso volvía a aparecer al final.
     const copyCodeHandler = () => {
       navigator.clipboard?.writeText(room.code).catch(() => {});
-      const label = root.querySelector('#btn-copy-code span');
-      if (label) {
-        const orig = label.textContent;
-        label.textContent = '¡Copiado!';
-        setTimeout(() => { label.textContent = orig; }, 1800);
-      }
+      clearTimeout(copyTimer);
+      const paint = copied => { const label = root.querySelector('#btn-copy-code span'); if (label) label.textContent = copied ? '¡Copiado!' : 'Copiar código'; };
+      paint(true);
+      copyTimer = setTimeout(() => paint(false), 1800);
     };
     root.querySelector('#btn-copy-code')?.addEventListener('click', copyCodeHandler);
     root.querySelector('#badge-room-code')?.addEventListener('click', copyCodeHandler);

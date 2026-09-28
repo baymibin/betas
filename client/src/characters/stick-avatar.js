@@ -1,8 +1,10 @@
 import {setGlow} from '../world/material-color.js';
 import {boardSkins} from '../shared/board-cosmetics.js';
+import {wingFiles, wingUrl, hatUrl} from '../shared/catalog.js';
 
 export const characterColors = ['#f6faf8', '#60ded9', '#ffba61', '#c2a5ff', '#ff829b'];
-export const boardColors = boardSkins.map(skin=>skin.color);
+// Color de cada tabla leído en el momento: las tablas subidas desde el panel se añaden después.
+export const boardColorOf = index => boardSkins[index]?.color || boardSkins[0].color;
 const boardTextures = new WeakMap();
 
 function boardTexture(B, scene, index) {
@@ -24,7 +26,7 @@ export function borderColor(hex) {
 }
 
 // 3D Low Poly Futuristic Stickman and Surfboard
-export function createStickAvatar(B, scene, parent, character = 0, board = 0, wing = 0) {
+export function createStickAvatar(B, scene, parent, character = 0, board = 0, wing = 0, hat = 0) {
   const root = new B.TransformNode('stick-surfer', scene);
   root.parent = parent;
 
@@ -44,7 +46,7 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
 
   const skinColor = characterColors[character] || characterColors[0];
   const skinIndex=boardSkins[board]?board:0;
-  const boardColor = boardColors[skinIndex];
+  const boardColor = boardColorOf(skinIndex);
   const borderHex = borderColor(skinColor);
 
   const bodyMat = makeStdMat('stick-body', skinColor, 0.22, 0.06);
@@ -175,29 +177,18 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
   limbMesh.thinInstanceSetBuffer('matrix', limbMatrices, 16, false);
   const limbMatrix = new B.Matrix(), limbScale = new B.Vector3(1, 1, 1), limbPosition = new B.Vector3(), limbRotation = new B.Quaternion();
 
-  // 3D Animated Wings Accessory (9 High-Resolution Spritesheets from Root)
-  const WING_FILES = [
-    'angel_wings.webp',
-    'aqua_wings.webp',
-    'fire_wings.webp',
-    'crystal_wings.webp',
-    'nature_wings.webp',
-    'bat_demon_wings.webp',
-    'crimson_butterfly_wings.webp',
-    'dark_demon_wings.webp',
-    'mechanical_demon_wings.webp'
-  ];
-
+  // 3D Animated Wings Accessory: hojas de 4×2 fotogramas del catálogo (base o subidas desde el
+  // panel administrativo, que se añaden al final de wingFiles).
   let wingPlane = null, wingTex = null;
   const wingIndex = Number(wing);
-  if (wingIndex >= 0 && wingIndex < WING_FILES.length) {
+  if (wingIndex >= 0 && wingIndex < wingFiles.length) {
     wingPlane = B.MeshBuilder.CreatePlane('stick-wings', {width: 1.45, height: 1.45}, scene);
     wingPlane.parent = rig;
     wingPlane.rotation.y = Math.PI; // Face towards camera (viewed from behind)
     wingPlane.isPickable = false;
     wingPlane.metadata = {excludePowerGlow: true};
 
-    wingTex = new B.Texture('/assets/images/wings/' + WING_FILES[wingIndex], scene, true, false);
+    wingTex = new B.Texture(wingUrl(wingIndex), scene, true, false);
     wingTex.hasAlpha = true;
     wingTex.uScale = 0.25; // 4 columns
     wingTex.vScale = 0.5;  // 2 rows
@@ -214,6 +205,29 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
     wingMat.backFaceCulling = false;
     materials.push(wingMat);
     wingPlane.material = wingMat;
+  }
+
+  // Hat: imagen frontal con transparencia (subida desde el panel) sobre la cabeza, siempre de
+  // cara a la cámara. hat 0 = sin hat.
+  let hatPlane = null;
+  const hatFile = hatUrl(Number(hat));
+  if (hatFile) {
+    hatPlane = B.MeshBuilder.CreatePlane('stick-hat', {width: 0.62, height: 0.62}, scene);
+    hatPlane.parent = rig;
+    hatPlane.billboardMode = B.Mesh.BILLBOARDMODE_Y;
+    hatPlane.isPickable = false;
+    hatPlane.metadata = {excludePowerGlow: true};
+    const hatTex = new B.Texture(hatFile, scene, true, true);
+    hatTex.hasAlpha = true;
+    textures.push(hatTex);
+    const hatMat = new B.StandardMaterial('stick-hat-mat', scene);
+    hatMat.diffuseTexture = hatTex;
+    hatMat.useAlphaFromDiffuseTexture = true;
+    hatMat.emissiveColor = new B.Color3(0.85, 0.85, 0.85);
+    hatMat.specularColor = new B.Color3(0.1, 0.1, 0.1);
+    hatMat.backFaceCulling = false;
+    materials.push(hatMat);
+    hatPlane.material = hatMat;
   }
 
   const points = Array.from({length: 10}, () => new B.Vector3());
@@ -279,6 +293,7 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
     // Head smoothly tracks looking down the wave line
     head.position.set(points[1].x, shoulderY + 0.22, 0);
     head.rotation.y = -steer * 0.35;
+    if (hatPlane) hatPlane.position.set(points[1].x, shoulderY + 0.52, 0);
 
     // Wings attached behind upper back, following spine, banking, and bobbing
     if (wingPlane && wingTex) {
@@ -502,7 +517,7 @@ export function createStickAvatar(B, scene, parent, character = 0, board = 0, wi
 
 // 2D Previews with distinct silhouettes for shop and ranking
 export function previewSvg(character, board, isBoard = false) {
-  const color = isBoard ? boardColors[board] : characterColors[character];
+  const color = isBoard ? boardColorOf(board) : characterColors[character] || characterColors[0];
   const border = borderColor(color);
 
   let drawing = '';
@@ -532,6 +547,6 @@ export function previewSvg(character, board, isBoard = false) {
 
 export function raceAvatarSvg(character = 0, board = 0) {
   const c = characterColors[character] || characterColors[0];
-  const b = boardColors[board] || boardColors[0];
+  const b = boardColorOf(board);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" aria-hidden="true"><path d="M8 87Q40 65 94 78Q72 103 8 87" fill="${b}" stroke="${borderColor(b)}" stroke-width="3"/><path d="M15 89Q50 80 87 81" fill="none" stroke="#fff" stroke-width="2"/><g fill="none" stroke="${borderColor(c)}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d="M52 33L44 57L28 68L28 82M44 57L62 68L76 80M49 41L29 43L17 35M49 41L66 43L81 35"/></g><g fill="none" stroke="${c}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M52 33L44 57L28 68L28 82M44 57L62 68L76 80M49 41L29 43L17 35M49 41L66 43L81 35"/></g><circle cx="55" cy="21" r="11" fill="${c}" stroke="${borderColor(c)}" stroke-width="2"/></svg>`;
 }

@@ -2571,7 +2571,9 @@
 #rooms-browser.mp-menu.mp-create-mode .cp-capacity .mp-stepper { margin-top: calc(6 * var(--s)); }
 #rooms-browser.mp-menu.mp-create-mode .cp-capacity .mp-step-btn,
 #rooms-browser.mp-menu.mp-create-mode .cp-capacity .mp-stepper-display { height: calc(34 * var(--s)); }
-#rooms-browser.mp-menu.mp-create-mode .cp-code { margin-top: calc(8 * var(--s)); padding-top: calc(7 * var(--s)); }
+#rooms-browser.mp-menu.mp-create-mode .cp-code { margin-top: calc(6 * var(--s)); padding-top: calc(5 * var(--s)); }
+/* Un poco más de aire entre el código de sala y "Crear sala de espera" (antes quedaban pegados). */
+#rooms-browser.mp-menu.mp-create-mode .cp-create-btn { margin-top: calc(9 * var(--s)); height: calc(41 * var(--s)); }
 #rooms-browser.mp-menu.mp-create-mode .cp-bots-stepper {
   display: flex;
   align-items: center;

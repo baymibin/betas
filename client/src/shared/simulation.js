@@ -1,7 +1,7 @@
 import {SURF_LIMIT,courseHits,rampHeight,LAP_LENGTH,TOTAL_LAPS} from './course.js';
 export const DT = 1 / 30;
 export function playerSpeed(p,boost=false,throttle=false){return p.countdown||p.place?0:p.slowTicks>0?8:p.turboTicks>0?38:p.impulse<0?7:p.impulse>0?28:p.slipActive&&p.slipTicks>0?31:boost?34:(throttle?21:16);}
-export function createPlayer(id) { return {id,seq:0,x:0,z:0,y:0,vy:0,energy:1,impulse:0,mapId:0,countdown:0,raceTicks:0,ramps:0,jumps:0,place:0,trick:0,heldItem:0,shieldTicks:0,turboTicks:0,slowTicks:0,guardTicks:0,foamTicks:0,dolphinTicks:0,slipTicks:0,slipTarget:0,slipActive:0}; }
+export function createPlayer(id) { return {id,seq:0,x:0,z:0,y:0,vy:0,energy:1,impulse:0,mapId:0,countdown:0,raceTicks:0,ramps:0,jumps:0,place:0,trick:0,heldItem:0,itemRoll:0,shieldTicks:0,turboTicks:0,slowTicks:0,guardTicks:0,foamTicks:0,dolphinTicks:0,slipTicks:0,slipTarget:0,slipActive:0}; }
 export function advance(p, axis, buttons) {
   if(p.countdown===65535)return;
   if(p.countdown>0){p.countdown--;return;}

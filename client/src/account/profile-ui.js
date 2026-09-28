@@ -48,9 +48,10 @@ function renderLeft() {
   const id = $('profile-id');
   id.hidden = !account.authenticated;
   if (account.authenticated) {
-    // Código de surfista: lo que se comparte para recibir ofertas de Trade.
-    id.innerHTML = (account.tradeCode ? `<span class="profile-code">Código de surfista: <b>${escapeHtml(account.tradeCode)}</b><button type="button" data-copy="${escapeHtml(account.tradeCode)}" aria-label="Copiar código de surfista" title="Copiar código">${ICON.copy}</button></span>` : '')
-      + `<span>ID Surf Salvaje: ${escapeHtml(account.user.id)}<button type="button" data-copy="${escapeHtml(account.user.id)}" aria-label="Copiar ID" title="Copiar ID">${ICON.copy}</button></span>`;
+    // Código de surfista (lo que se comparte para recibir ofertas de Trade). El ID interno de la
+    // cuenta no se muestra.
+    id.hidden = !account.tradeCode;
+    id.innerHTML = account.tradeCode ? `<span class="profile-code">Código de surfista: <b>${escapeHtml(account.tradeCode)}</b><button type="button" data-copy="${escapeHtml(account.tradeCode)}" aria-label="Copiar código de surfista" title="Copiar código">${ICON.copy}</button></span>` : '';
     id.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => navigator.clipboard?.writeText(b.dataset.copy));
   }
 }

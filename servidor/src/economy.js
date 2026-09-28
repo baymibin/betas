@@ -119,7 +119,7 @@ export function createEconomy(db, config = {}) {
     return (await db.all('SELECT id, category, asset_index AS assetIndex, name, description, asset, price_normal AS price FROM shop_items WHERE available = 1 ORDER BY sort_order'))
       .map(row => ({...row, assetIndex: num(row.assetIndex), price: num(row.price)}))
       .map(row => ({...row, free: row.price === 0, owned: row.price === 0 || owned.has(row.id), equipped: !!eq && eq[row.category] === row.assetIndex,
-        rarity: rarity(row.id), tradeable: tradeable(row.id, row.price)}));
+        rarity: rarity(row.id), tradeable: tradeable(row.id, row.price), forSale: !(config.notForSale || []).includes(row.id)}));
   }
   // Rareza (solo presentación, desde economy.json) y si el item puede ir en un trade: los
   // gratuitos no (todo el mundo los tiene), ni los que la configuración excluya.
@@ -150,6 +150,7 @@ export function createEconomy(db, config = {}) {
         const item = parseItemId(id) && await itemRow(id, t);
         if (!item || !item.available) throw new EconomyError('item_not_found', 404);
         if (item.price === 0) throw new EconomyError('item_is_free', 409);
+        if ((config.notForSale || []).includes(id)) throw new EconomyError('item_not_for_sale', 409);
         if (await owns(userId, id, t)) throw new EconomyError('already_owned', 409);
         await move(userId, NORMAL, -item.price, 'ITEM_PURCHASE', 'purchase:' + requestId, item.name, t);
         await t.run('INSERT INTO user_inventory_v2 (user_id, item_id, source, reference) VALUES (?, ?, ?, ?)', [userId, id, 'PURCHASE', requestId]);

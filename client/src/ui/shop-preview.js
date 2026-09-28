@@ -4,7 +4,7 @@ import {boardSkins} from '../shared/board-cosmetics.js';
 // A small, independent Babylon scene renders only while the shop is open.
 export function createShopPreview(canvas) {
   let engine, scene, camera, avatar, boardStand, boardMaterial, running=false;
-  let selection={character:0,board:0,wing:0};
+  let selection={character:0,board:0,wing:0,hat:0};
   let start=0, dragStart=null, angle=0;
   const B=window.BABYLON;
   const boardTextures=new Map();
@@ -146,7 +146,7 @@ export function createShopPreview(canvas) {
   function rebuild() {
     if(!scene) return;
     avatar?.disposeAvatar();
-    avatar=createStickAvatar(B,scene,null,selection.character,selection.board,selection.wing);
+    avatar=createStickAvatar(B,scene,null,selection.character,selection.board,selection.wing,selection.hat|0);
     avatar.position.x=-.52;
     avatar.scaling.setAll(1.15);
     // In the showcase the deck is viewed at a steep angle. Let its artwork

@@ -441,7 +441,64 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
   - usa el cristal de los demás modales y los botones del juego: REANUDAR dorado como JUGAR, y "Salir al menú" como los botones secundarios del inicio;
   - antes, `font: 900 16px inherit` era CSS inválido y los botones salían con la fuente del sistema.
 
+## Panel administrativo (2026-09-28)
 
+**IMPLEMENTADO · PROBADO (servidor en SQLite y MariaDB; navegador Chromium).**
+
+- **Acceso:**
+  - Dirección `https://tu-dominio/admin`, con usuario y contraseña. No usa Google ni Discord: son cuentas propias del panel (`admin_users`).
+  - Para crear el administrador (o cambiarle la contraseña), en `servidor/`: `npm run admin -- admin-user <usuario> <contraseña>`. La contraseña debe tener 10 caracteres o más.
+  - Alternativa: `ADMIN_USER` + `ADMIN_PASSWORD` en `.env`. Solo crea el administrador si todavía no existe ninguno. Después conviene quitar `ADMIN_PASSWORD`.
+- **Seguridad:**
+  - contraseñas con scrypt;
+  - cookie `ss_admin` HttpOnly + SameSite=Strict limitada a `/admin`, que dura 8 h, y en la base solo se guarda su SHA-256;
+  - cabecera `X-Admin-CSRF` + Origin en todo lo que cambia algo;
+  - 5 intentos fallidos bloquean 15 min;
+  - cambiar la contraseña cierra las sesiones abiertas;
+  - cada acción queda en `admin_audit` (sección "Registro").
+- **Secciones:**
+  - **Resumen:** usuarios (y nuevos hoy), compras y monedas gastadas, monedas en circulación, recompensas de hoy, trades y últimas compras y trades.
+  - **Usuarios:** búsqueda por nick, código `SURF-XXXXX` o ID. En la ficha:
+    - ver accesos, saldo, inventario, movimientos y trades;
+    - ajustar monedas (siempre con motivo; nunca puede quedar negativo);
+    - entregar o quitar items (lo quitado se desequipa).
+  - **Compras** y **Movimientos**, con filtro por tipo.
+  - **Trades:** filtro por estado; los completados se pueden **revertir** si los items siguen en manos de quien los recibió.
+  - **Tienda:**
+    - editar precio, rareza, nombre, descripción y "a la venta" de cualquier item. El item 0 de cada ranura es de serie y siempre gratis;
+    - **subir tablas, wings y hats nuevos.** Se validan la firma real (PNG, WebP o JPEG) y el tamaño (hasta 4 MB), y se guardan en `servidor/data/uploads` con nombre aleatorio (fuera de git; `UPLOADS_DIR` lo cambia);
+    - los items subidos se **añaden al final** de su lista (`custom_items`), así que nunca cambia un índice existente, y se ven en la tienda, el Trade, las salas y la carrera;
+    - formatos:
+      - tabla: vista cenital en vertical, fondo transparente;
+      - wing: hoja de 4×2 fotogramas, como las actuales;
+      - hat: imagen frontal cuadrada. Se dibuja sobre la cabeza del surfer, siempre de cara a la cámara.
+  - **Monedas:** paquetes Oro → Normales, productos de oro (precio en céntimos; la compra real sigue desactivada) y recompensas de carrera. Se aplican al momento.
+  - **Registro:** entradas, intentos fallidos y cada acción del panel.
+- **Dónde se guardan los cambios:** en la base de datos (`item_overrides`, `economy_overrides`, `custom_items`; migración `004_admin.sql`), por encima de `economy.json`. Los jugadores ven los items y los precios nuevos al recargar el juego (`/api/catalog/custom`).
+- **Nota:** "a la venta" desactivado oculta el item de La tiendita y bloquea su compra (`item_not_for_sale`), pero quien ya lo tiene lo conserva.
+
+## Ajustes del juego (2026-09-28, tercera entrega)
+
+**IMPLEMENTADO · PROBADO (navegador Chromium y pruebas automáticas).**
+
+- **Caja de poder estilo Mario Kart:**
+  - Al coger una caja, la ruleta gira 2,5 s (`ITEM_ROLL_TICKS`).
+  - Pulsar **E** mientras gira solo la **para** y muestra el poder; hay que volver a pulsar E para usarlo. Si no se pulsa, la ruleta se para sola.
+  - Es una regla de la simulación (servidor, práctica y predicción del cliente, igual en los tres) y viaja en el SNAPSHOT (byte libre 106, sin cambiar la versión del protocolo). Los bots esperan a ver su poder.
+- **Mirar atrás (clic derecho sostenido):** antes nunca se activaba sobre el juego, porque Babylon cancela los `mousedown` del canvas. Ahora usa eventos pointer y muestra el aviso "MIRANDO ATRÁS".
+- **Salas:**
+  - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
+  - el código se muestra con una nota explicativa y queda más separado del botón "Crear sala de espera";
+  - "Copiar código" ya no rebota entre "¡Copiado!" y "Copiar código" al pulsarlo dos veces.
+- **Bots en salas:** comprobado en navegador que los bots elegidos están en la sala de espera, en el ranking (8/8 surfistas) y en la carrera. Al principio salen justo al lado y detrás de la cámara.
+- **Perfil:** ya no se muestra el ID interno, solo el código de surfista.
+- **Ajustes:** el modal ya no se estira al mover un volumen (el aviso "Preferencias guardadas" tiene su espacio reservado).
+- **Menú:** el icono del Trade pasa a `menu-trade.png`, como los demás iconos del menú.
+- **La tiendita:**
+  - la pestaña "Conseguir monedas" pasa a llamarse **Monedas**;
+  - **Hats** ya no dice "Pronto" y muestra los hats subidos desde el panel.
+
+## 21. Archivos modificados (esta fase)
 
 - `client/index.html`: logo SVG, panel de acceso, botones de Google y Discord, datos con iconos, perfil y tienda (monedero, pestaña Conseguir monedas).
 - `client/src/ui/shop.js`: precios, propiedad, compra, equipar en cuenta y Conseguir monedas.
@@ -586,6 +643,10 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Panel administrativo y ajustes del juego
+- Panel `/admin` con usuario y contraseña. Permite ver usuarios, compras, movimientos y trades; ajustar monedas, entregar y quitar items y revertir trades; editar la tienda; subir tablas, wings y hats; y editar paquetes de monedas y recompensas. Migración 004.
+- Caja de poder estilo Mario Kart (E para la ruleta y E usa el poder), mirar atrás con clic derecho, salas privadas por código, arreglo de "Copiar código", Perfil sin ID, Ajustes sin estirarse, tienda con "Monedas" y hats reales, e icono del Trade en PNG.
 
 ### 2026-09-28 · Trades públicos, inicio simplificado y modales unificados
 - Tablón de Trades públicos (publicar, negociar, retirar) con migración 003. Trade con 🌊 y sin redimensionarse al abrir.

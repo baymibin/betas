@@ -3,7 +3,7 @@
 //   /auth/{google|discord}/callback                -> vuelta del proveedor, crea la sesión
 //   POST /auth/logout
 //   GET  /api/me                                   -> estado de la sesión, perfil, monedero...
-//   GET  /api/shop/catalog · POST /api/shop/purchase · POST /api/shop/equip
+//   GET  /api/shop/catalog · POST /api/shop/purchase · POST /api/shop/equip · GET /api/catalog/custom
 //   GET  /api/coins/packages · POST /api/coins/exchange · GET /api/wallet/transactions
 //   GET  /api/payments/products · POST /api/payments/checkout · POST /api/payments/webhook/:provider
 //   POST /api/account/nickname · POST /api/account/unlink · POST /api/account/migrate-local
@@ -35,7 +35,7 @@ export function createRateLimiter(limits) {
   };
 }
 
-export function mountApi(app, {auth, economy, trade, config, onEquipmentChanged = () => {}, payments = {enabled: false}}) {
+export function mountApi(app, {auth, economy, trade, economyConfig = {}, config, onEquipmentChanged = () => {}, payments = {enabled: false}}) {
   // Por IP y minuto. En una LAN varios jugadores comparten IP, por eso no es muy estricto.
   const env = process.env;
   const allow = createRateLimiter({auth: Number(env.RATE_LIMIT_AUTH) || 60, write: Number(env.RATE_LIMIT_WRITE) || 120, read: Number(env.RATE_LIMIT_READ) || 600});
@@ -165,6 +165,11 @@ export function mountApi(app, {auth, economy, trade, config, onEquipmentChanged 
   }, {group: 'write'});
 
   // ---------- La tiendita ----------
+  // Items subidos desde el panel y textos editados: el navegador los añade al catálogo al cargar.
+  route('get', '/api/catalog/custom', async () => ({json: {
+    items: (economyConfig.customItems || []).map(({category, assetIndex, name, description, file, fullFile, color, width}) => ({category, assetIndex, name, description, file, fullFile, color, width})),
+    texts: economyConfig.itemTexts || []
+  }}));
   route('get', '/api/shop/catalog', async ctx => ({json: {items: await economy.catalog(ctx.userId), wallet: ctx.userId ? await economy.wallet(ctx.userId) : null}}));
   route('post', '/api/shop/purchase', async ctx => ({json: await economy.purchase(ctx.userId, String(ctx.body.itemId || ''), ctx.body.requestId)}), {group: 'write'});
   route('post', '/api/shop/equip', async ctx => {

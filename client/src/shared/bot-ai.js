@@ -112,8 +112,9 @@ export function botInput(brain, p, world, players) {
   else if (brain.boosting && p.energy <= L.boostStop) brain.boosting = false;
   if (brain.boosting) buttons |= BOOST;
 
-  // ---- Habilidades: se usan según su regla real (ver stepPowerWorld).
-  if (p.heldItem) {
+  // ---- Habilidades: se usan según su regla real (ver stepPowerWorld). Mientras gira la
+  // ruleta no se pulsa nada: el bot espera a ver su poder, como un jugador que la deja girar.
+  if (p.heldItem && !p.itemRoll) {
     if (brain.itemSince < 0) { brain.itemSince = brain.tick; brain.itemWait = L.itemDelay[0] + Math.floor(rand() * (L.itemDelay[1] - L.itemDelay[0])); }
     if (shouldUse(brain, p, world, players, d0)) { buttons |= USE; brain.stats.items++; }
   } else brain.itemSince = -1;

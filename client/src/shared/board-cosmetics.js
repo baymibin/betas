@@ -6,7 +6,7 @@ export const boardSkins = [
   {name:'Cine', file:'/assets/images/boards/tabla-cine-deck.webp', fullFile:'/assets/images/boards/tabla-cine.webp', color:'#e5a340', width:0.79},
   {name:'Bloques', file:'/assets/images/boards/tabla-bloques-deck.webp', fullFile:'/assets/images/boards/tabla-bloques.webp', color:'#63c97e', width:0.81}
 ];
-// Cantidad de wings y hats del catálogo (validación compartida cliente/servidor).
-// Los archivos de wings viven en shared/catalog.js (wingFiles) y characters/stick-avatar.js.
+// Cantidad de wings y hats del catálogo BASE. Los que se suben desde el panel se añaden al final
+// (shared/catalog.js · applyCustomItems): para validar se usan wingFiles.length y hats.length.
 export const WING_COUNT = 9;
-export const HAT_COUNT = 1;   // 0 = sin hat (los hats llegan "Pronto")
+export const HAT_COUNT = 1;   // 0 = sin hat
