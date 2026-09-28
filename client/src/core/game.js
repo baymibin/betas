@@ -1,3 +1,4 @@
+import './catalog-remote.js';   // items subidos desde el panel, antes de crear avatares
 import {tropicalWaterFragment,createTropicalSky} from '../world/tropical-shaders.js';
 import {createPowerWorld,stepPowerWorld} from '../shared/powerups.js';
 import {botLooks,createBotPlayer,createBrain,botInput} from '../shared/bot-ai.js';
@@ -1535,7 +1536,7 @@ function resetGame(){
   lateralOffset = 0;
   isJumping = false; jumpVel = 0; airY = 0; airClock = 0; spinAngle = 0;
   isSliding = false; slideTimer = 0;
-  boostValue = 0; boostActive = false; boostHeld=false; throttleHeld=false; lookBack=false; touchBoostUntil=0; net.boostHeld=false; if(net) net.throttleHeld=false; isPaused=false;
+  boostValue = 0; boostActive = false; boostHeld=false; throttleHeld=false; lookBack=false; document.body.classList.remove('looking-back'); touchBoostUntil=0; net.boostHeld=false; if(net) net.throttleHeld=false; isPaused=false;
   playerRoot.position.set(0, 0, 0);
   playerRoot.rotation.set(0, 0, 0);
   visualRoot.rotation.y = 0;
@@ -1606,7 +1607,7 @@ let practiceBots=[],practiceFinish=0;
 function clearPracticeBots(){practiceBots=[];practiceFinish=0;for(const [id,mesh] of rivals){mesh.disposeAvatar();rivals.delete(id);}}
 // Estado visual de los bots del solitario, interpolado entre ticks de simulación (30 Hz).
 function practiceBotStates(alpha){return practiceBots.map(({player:p,prev})=>({...p,x:prev.x+(p.x-prev.x)*alpha,y:prev.y+(p.y-prev.y)*alpha,z:prev.z+(p.z-prev.z)*alpha}));}
-function practiceField(){return [{...localPlayer,character:profile.character,board:profile.board,wing:profile.wing,nick:profile.nick||'Tú'},...practiceBots.map(b=>b.player)];}
+function practiceField(){return [{...localPlayer,character:profile.character,board:profile.board,wing:profile.wing,hat:profile.hat|0,nick:profile.nick||'Tú'},...practiceBots.map(b=>b.player)];}
 window.__surfDebug = { getPlayer: () => localPlayer, getWorld: () => localPowerWorld, getBots: () => practiceBots };
 let worldArt=null,activeMapId=-1;
 let courseView,trackView,mapObjects=[],mapMaterials=[];
@@ -1626,11 +1627,11 @@ function buildMap(id){
 }
 buildMap(PARAMS.has('map') ? parseInt(PARAMS.get('map')) : 0);
 function applyAppearance() {
-  const appearance=`${profile.character}|${profile.board}|${profile.wing}`;
+  const appearance=`${profile.character}|${profile.board}|${profile.wing}|${profile.hat|0}`;
   if(avatar&&avatarAppearance===appearance)return;
   avatar?.disposeAvatar();
   visualRoot.getChildMeshes().forEach(mesh=>mesh.setEnabled(false));
-  avatar=createStickAvatar(BABYLON,scene,playerRoot,profile.character,profile.board,profile.wing);
+  avatar=createStickAvatar(BABYLON,scene,playerRoot,profile.character,profile.board,profile.wing,profile.hat|0);
   avatarAppearance=appearance;
 }
 document.addEventListener('surf:appearance',()=>{applyAppearance();net.sendProfile(profile);});
@@ -1665,7 +1666,7 @@ function drawRivals(samples,dt) {
     // si lo cambia, se reconstruye solo ese avatar.
     const look=r.character+'|'+r.board+'|'+(r.wing||0)+'|'+(r.hat||0);
     if(mesh&&mesh.appearance!==look){mesh.disposeAvatar();rivals.delete(r.id);mesh=null;}
-    if(!mesh) { mesh=createStickAvatar(BABYLON,scene,null,r.character,r.board,r.wing||0);mesh.name=r.nick;mesh.appearance=look;rivals.set(r.id,mesh); }
+    if(!mesh) { mesh=createStickAvatar(BABYLON,scene,null,r.character,r.board,r.wing||0,r.hat||0);mesh.name=r.nick;mesh.appearance=look;rivals.set(r.id,mesh); }
     mesh.setEnabled(true);
     if(r.jumps>(mesh.lastJump||0)||r.ramps>(mesh.lastRamp||0)){mesh.trickAt=elapsed;mesh.trickKind=r.trick;}
     mesh.lastJump=r.jumps;mesh.lastRamp=r.ramps;
@@ -1725,10 +1726,15 @@ function updatePractice(dt) {
   syncMovement({...localPlayer,x:localPrev.x+(localPlayer.x-localPrev.x)*alpha,y:localPrev.y+(localPlayer.y-localPrev.y)*alpha,z:localPrev.z+(localPlayer.z-localPrev.z)*alpha},dt,axis);
   if(practiceBots.length)drawRivals(practiceBotStates(localAccumulator/DT),dt);
 }
-window.addEventListener('mousedown',e=>{if(e.button===2&&running){lookBack=true;e.preventDefault();}});
-window.addEventListener('mouseup',e=>{if(e.button===2)lookBack=false;});
+// Mirar atrás (clic derecho sostenido). Con eventos pointer y en captura: Babylon hace
+// preventDefault en pointerdown del canvas y eso anula los mousedown/mouseup de compatibilidad,
+// por eso con 'mousedown' nunca se activaba sobre el juego.
+const setLookBack=v=>{lookBack=v;document.body.classList.toggle('looking-back',v);};
+window.addEventListener('pointerdown',e=>{if(e.button===2&&running){setLookBack(true);e.preventDefault();}},true);
+window.addEventListener('pointerup',e=>{if(e.button===2)setLookBack(false);},true);
+window.addEventListener('pointercancel',()=>setLookBack(false),true);
 window.addEventListener('contextmenu',e=>{if(running)e.preventDefault();});
-window.addEventListener('blur',()=>{ keyState.left=false; keyState.right=false; boostHeld=false;throttleHeld=false;lookBack=false;net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
+window.addEventListener('blur',()=>{ keyState.left=false; keyState.right=false; boostHeld=false;throttleHeld=false;setLookBack(false);net.boostHeld=false;if(net)net.throttleHeld=false;net.axis=0; });
 
 function doJump(){ if(!running||isPaused)return;if(online)net.buttons|=1;else localButtons|=1; playSound('jump'); }
 function tryBoost(){ if(!running||isPaused)return;touchBoostUntil=elapsed+1.4;if(online)net.buttons|=2;else localButtons|=2; }

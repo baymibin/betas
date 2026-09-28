@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Surf Salvaje · Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+<main id="login-view" class="login-view" hidden>
+  <form id="login-form" class="login-card" autocomplete="on">
+    <span class="kicker">SURF SALVAJE · ADMINISTRACIÓN</span>
+    <h1>Panel 🌊</h1>
+    <label>Usuario<input id="login-user" name="username" autocomplete="username" required maxlength="32"></label>
+    <label>Contraseña<input id="login-pass" name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
+    <button type="submit" class="btn gold" id="login-submit">Entrar</button>
+    <p id="login-error" class="form-error" role="alert"></p>
+    <p class="hint">Crea el acceso en el servidor con <code>npm run admin -- admin-user &lt;usuario&gt; &lt;contraseña&gt;</code>.</p>
+  </form>
+</main>
+
+<div id="app" class="app" hidden>
+  <aside class="sidebar">
+    <div class="brand">SS<span>PANEL</span></div>
+    <nav id="nav" aria-label="Secciones">
+      <button data-view="dashboard" class="is-active">📊 Resumen</button>
+      <button data-view="users">👤 Usuarios</button>
+      <button data-view="purchases">🛒 Compras</button>
+      <button data-view="transactions">💰 Movimientos</button>
+      <button data-view="trades">🔁 Trades</button>
+      <button data-view="catalog">🏝️ Tienda</button>
+      <button data-view="economy">🪙 Monedas</button>
+      <button data-view="audit">📜 Registro</button>
+    </nav>
+    <div class="sidebar-foot"><span id="admin-name"></span><button id="logout" class="btn ghost small">Cerrar sesión</button></div>
+  </aside>
+  <section class="content">
+    <header class="content-head"><h2 id="view-title">Resumen</h2><p id="toast" class="toast" role="status"></p></header>
+    <div id="view"></div>
+  </section>
+</div>
+
+<dialog id="drawer" class="drawer"><div id="drawer-body"></div></dialog>
+<script type="module" src="/admin/admin.js"></script>
+</body>
+</html>

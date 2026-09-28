@@ -85,6 +85,14 @@
   box-shadow: 0 6px 16px #00121c55, inset 0 1px 0 #ffffff26;
 }
 .pause-btn.quit:hover { border-color: #b8f3ff; }
+/* Clic derecho sostenido: aviso de que la cámara mira hacia atrás. */
+body.looking-back::after {
+  content: 'MIRANDO ATRÁS';
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 30;
+  padding: 5px 16px; border-radius: 999px; border: 1px solid #8feaf088;
+  background: #04283acc; color: #5ce8f0; font: 800 13px 'Baloo 2', sans-serif; letter-spacing: 3px;
+  pointer-events: none; box-shadow: 0 6px 16px #00121c66;
+}
 #shop-dialog {width:min(1190px,96vw);max-width:none;max-height:94dvh;box-sizing:border-box;padding:0;overflow:hidden;border:1px solid #b8f3ff78;border-radius:30px;background:#082e3b;color:#f6ffff;font-family:inherit;box-shadow:0 26px 90px #00131dbb, inset 0 0 0 1px #ffffff25;}
 #shop-dialog::backdrop {background:linear-gradient(#001d2c88,#001725bb),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;backdrop-filter:blur(9px);}
 .shop-shell {height:min(680px,91dvh);min-height:520px;display:flex;flex-direction:column;padding:20px 24px 18px;box-sizing:border-box;background:linear-gradient(115deg,#062c40ee 0%,#063a4cde 50%,#074253a8 100%),url('/assets/images/shop/shop-bg-tropical.webp') center/cover;}

@@ -17,6 +17,8 @@ import {createEconomy} from './economy.js';
 import {createTrade} from './trade.js';
 import {authConfig, createAuth, SESSION_COOKIE} from './auth.js';
 import {mountApi, parseCookies} from './api.js';
+import {createAdmin} from './admin.js';
+import {mountAdmin} from './admin-api.js';
 
 const clientRoot = fileURLToPath(new URL('../../client/', import.meta.url));
 // Variables de entorno locales (servidor/.env, nunca en git). Ver .env.example.
@@ -32,6 +34,9 @@ await syncCatalog(db, economyConfig);
 const economy = createEconomy(db, economyConfig);
 await economy.loadCache();
 const trade = createTrade(db, economy, economyConfig);
+// Panel administrativo (/admin). Las imágenes subidas viven fuera de git, junto a la base SQLite.
+const uploadsRoot = resolve(fileURLToPath(new URL('../', import.meta.url)), process.env.UPLOADS_DIR || 'data/uploads');
+mkdirSync(uploadsRoot, {recursive: true});
 const authSettings = authConfig();
 const auth = createAuth(db, economy, authSettings);
 const socketsByUser = new Map();   // surf_user_id -> conexiones /play abiertas
@@ -64,7 +69,8 @@ const screenshotsRoot = fileURLToPath(new URL('../artifacts/screenshots/', impor
 mkdirSync(screenshotsRoot, {recursive:true});
 const rooms = new Set(); let nextId = 1, tick = 0;
 const lobbyPeers=new Set();
-function publishLobby(){const data=roomList([...rooms].map(r=>({code:r.code,mapId:r.mapId,count:r.size,bots:r.bots.length,capacity:r.capacity,started:r.started,host:[...r].find(w=>w.getUserData().player.id===r.hostId)?.getUserData().player.nick||'Surfer'})));for(const peer of lobbyPeers)if(peer.getBufferedAmount()===0)peer.send(data,true);return data;}
+// Las salas privadas no se listan: solo se entra con su código (ROOM_REQUEST modo 2).
+function publishLobby(){const data=roomList([...rooms].filter(r=>!r.private).map(r=>({code:r.code,mapId:r.mapId,count:r.size,bots:r.bots.length,capacity:r.capacity,started:r.started,host:[...r].find(w=>w.getUserData().player.id===r.hostId)?.getUserData().player.nick||'Surfer'})));for(const peer of lobbyPeers)if(peer.getBufferedAmount()===0)peer.send(data,true);return data;}
 function broadcastRoom(room){publishLobby();const buffer=roomState(room);for(const ws of room)ws.send(buffer,true);}
 // ---------- Bots (autoritativos: solo el servidor los simula y decide su equipamiento) ----------
 // Plazas de bots = mín(lo pedido por el anfitrión, capacidad − humanos). Los humanos tienen
@@ -82,7 +88,7 @@ function syncBots(room){
 }
 function roomPlayers(room){return humansOf(room).concat(room.bots.map(b=>b.player));}
 function assignRoom(ws,v){
- const d=ws.getUserData();if(d.room||(v.byteLength!==21&&v.byteLength!==22))throw Error('Invalid room request');
+ const d=ws.getUserData();if(d.room||v.byteLength<21||v.byteLength>23)throw Error('Invalid room request');
  const mode=v.getUint8(12),mapId=v.getUint8(13),capacity=v.getUint8(20);if(capacity<2||capacity>8)throw Error('Invalid capacity');if(mapId>7||mode>2)throw Error('Invalid map');
  // Circuitos bloqueados temporalmente (maps.js): no se crean salas nuevas en ellos.
  if(mode!==2&&!isMapEnabled(mapId)){const e=packet(TYPE.ERROR,13);e.setUint8(12,2);ws.send(e.buffer,true);return;}
@@ -91,7 +97,8 @@ function assignRoom(ws,v){
  else {
   room=new Set();do{room.code=String(randomInt(100000,1000000));}while([...rooms].some(r=>r.code===room.code));
   room.powerWorld=createPowerWorld();room.capacity=capacity;room.mapId=mapId;room.hostId=d.player.id;room.finishCount=0;room.bots=[];if(mode===0)startRace(room);
-  room.botTarget=mode===1&&v.byteLength===22?Math.min(v.getUint8(21),capacity-1):0;rooms.add(room);
+  room.botTarget=mode===1&&v.byteLength>=22?Math.min(v.getUint8(21),capacity-1):0;
+  room.private=mode===1&&v.byteLength===23&&v.getUint8(22)===1;rooms.add(room);
  }
  d.room=room;room.add(ws);d.player.mapId=room.mapId;d.player.countdown=room.started?90:65535;syncBots(room);broadcastRoom(room);
 }
@@ -152,7 +159,9 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
     const pathname = decodeURIComponent(req.getUrl());
     const version = new URLSearchParams(req.getQuery() || '').get('v');
     const ifNoneMatch = req.getHeader('if-none-match');
-    const publicPath = pathname === '/' ? 'index.html' : pathname.slice(1);
+    // Imágenes subidas desde el panel (data/uploads): solo imágenes, nunca fuera de esa carpeta.
+    if (pathname.startsWith('/uploads/')) return serveUpload(res, pathname.slice('/uploads/'.length));
+    const publicPath = pathname === '/' ? 'index.html' : pathname === '/admin' || pathname === '/admin/' ? 'admin/index.html' : pathname.slice(1);
     // El manifiesto de assets no se expone como archivo: va embebido en el HTML.
     if (publicPath === 'asset-manifest.json') return res.writeStatus('404 Not Found').end();
     if (publicPath === 'index.html') return servePage(res, ifNoneMatch);
@@ -179,6 +188,13 @@ const app = uWS.App().ws('/lobby',{maxPayloadLength:16,idleTimeout:120,open(ws){
     res.writeStatus('404 Not Found').end();
   }
 });
+function serveUpload(res, name) {
+  const file = resolve(uploadsRoot, name), local = relative(uploadsRoot, file);
+  const type = {'.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg'}[extname(file)];
+  if (!type || !name || local.startsWith('..') || isAbsolute(local) || !existsSync(file)) return res.writeStatus('404 Not Found').end();
+  // Nombre aleatorio y contenido que no cambia: se puede guardar en caché para siempre.
+  res.writeHeader('Cache-Control', 'public, max-age=31536000, immutable').writeHeader('Content-Type', type).writeHeader('X-Content-Type-Options', 'nosniff').end(readFileSync(file));
+}
 // index.html con el manifiesto de assets embebido (sin petición extra a /asset-manifest.json).
 function servePage(res, ifNoneMatch) {
   let aborted = false; res.onAborted(() => { aborted = true; });
@@ -232,7 +248,15 @@ setInterval(() => {
 }, 4);
 let lastSnapshot = 0;
 const SNAPSHOT_BACKLOG = 4096;
-mountApi(app, {auth, economy, trade, config: authSettings, onEquipmentChanged: refreshEquipment});
+const admin = createAdmin(db, {economy, trade, config: economyConfig, uploadsDir: uploadsRoot, secure: authSettings.secure});
+// Primer administrador desde .env (ADMIN_USER / ADMIN_PASSWORD) solo si aún no existe ninguno.
+// Lo recomendado es crearlo por consola: npm run admin -- admin-user <usuario> <contraseña>
+if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD && !await admin.countUsers()) {
+  try { await admin.setUser(process.env.ADMIN_USER, process.env.ADMIN_PASSWORD); console.log('[admin] creado el administrador ' + process.env.ADMIN_USER + ' (puedes quitar ADMIN_PASSWORD de .env)'); }
+  catch (error) { console.error('[admin] no se pudo crear el administrador de .env:', error.code || error.message); }
+}
+mountAdmin(app, {admin, config: authSettings});
+mountApi(app, {auth, economy, trade, economyConfig, config: authSettings, onEquipmentChanged: refreshEquipment});
 app.listen(Number(process.env.PORT || 3000), token => {
   if (!token) { console.error('Unable to listen'); process.exit(1); }
   console.log('Surf Salvaje (protocolo v' + PROTOCOL_VERSION + '): http://localhost:' + (process.env.PORT || 3000));

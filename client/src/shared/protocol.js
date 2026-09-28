@@ -1,5 +1,6 @@
 import {makeBoxes} from './powerups.js';
-import {boardSkins,WING_COUNT,HAT_COUNT} from './board-cosmetics.js';
+import {boardSkins} from './board-cosmetics.js';
+import {wingFiles,hats} from './catalog.js';
 export const TYPE = { WELCOME: 1, INPUT: 2, SNAPSHOT: 3, PROFILE:4, ROOM_REQUEST:5, ROOM_STATE:6, ROOM_START:7, ERROR:8, ROOM_LIST:9, POWER_WORLD:10, ROOM_BOTS:11 };
 export const HEADER = 12;
 // Versión del protocolo: el servidor la envía en el byte 16 del WELCOME (17 bytes).
@@ -53,7 +54,7 @@ export function snapshot(players, tick) {
     writeName(v,o+30,p.nick||'Surfer');
     v.setFloat32(o+64,p.impulse||0,true);
     v.setUint8(o+68,p.mapId||0);v.setUint8(o+69,p.place||0);v.setUint16(o+70,p.countdown||0,true);
-    v.setUint32(o+72,p.raceTicks||0,true);v.setUint16(o+76,p.ramps||0,true);v.setUint16(o+78,p.jumps||0,true);v.setUint8(o+80,p.trick||0);v.setUint8(o+81,p.heldItem||0);v.setUint8(o+82,p.wing||0);v.setUint8(o+83,p.hat||0);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>v.setUint16(o+84+j*2,p[key]||0,true));v.setUint32(o+100,p.slipTarget||0,true);v.setUint8(o+104,p.slipActive||0);v.setUint8(o+105,p.bot?1:0);
+    v.setUint32(o+72,p.raceTicks||0,true);v.setUint16(o+76,p.ramps||0,true);v.setUint16(o+78,p.jumps||0,true);v.setUint8(o+80,p.trick||0);v.setUint8(o+81,p.heldItem||0);v.setUint8(o+82,p.wing||0);v.setUint8(o+83,p.hat||0);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>v.setUint16(o+84+j*2,p[key]||0,true));v.setUint32(o+100,p.slipTarget||0,true);v.setUint8(o+104,p.slipActive||0);v.setUint8(o+105,p.bot?1:0);v.setUint8(o+106,Math.min(255,p.itemRoll||0));
   }); return v.buffer;
 }
 export function states(v) {
@@ -63,7 +64,7 @@ export function states(v) {
     const o = 14 + i * 108, p = { id:v.getUint32(o,true), seq:v.getUint32(o+4,true),character:v.getUint8(o+28),board:v.getUint8(o+29),wing:v.getUint8(o+82),hat:v.getUint8(o+83),nick:readName(v,o+30),impulse:v.getFloat32(o+64,true) };
     Object.assign(p,{mapId:v.getUint8(o+68),place:v.getUint8(o+69),countdown:v.getUint16(o+70,true),raceTicks:v.getUint32(o+72,true),ramps:v.getUint16(o+76,true),jumps:v.getUint16(o+78,true),trick:v.getUint8(o+80)});
     ['x','z','y','vy','energy'].forEach((k,j) => { p[k] = v.getFloat32(o+8+j*4,true); });
-    p.heldItem=v.getUint8(o+81);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>p[key]=v.getUint16(o+84+j*2,true));p.slipTarget=v.getUint32(o+100,true);p.slipActive=v.getUint8(o+104);p.bot=v.getUint8(o+105);return p;
+    p.heldItem=v.getUint8(o+81);['shieldTicks','turboTicks','slowTicks','guardTicks','foamTicks','dolphinTicks','slipTicks'].forEach((key,j)=>p[key]=v.getUint16(o+84+j*2,true));p.slipTarget=v.getUint32(o+100,true);p.slipActive=v.getUint8(o+104);p.bot=v.getUint8(o+105);p.itemRoll=v.getUint8(o+106);return p;
   });
 }
 function writeName(v,offset,name) {
@@ -85,14 +86,18 @@ export function readProfile(v) {
  const long=v.byteLength===49;
  if((v.byteLength!==47&&!long) || v.getUint8(12)>4 || v.getUint8(13)>=boardSkins.length) throw Error('Invalid appearance');
  const wing=long?v.getUint8(47):0,hat=long?v.getUint8(48):0;
- if(wing>=WING_COUNT||hat>=HAT_COUNT) throw Error('Invalid appearance');
+ // Límites reales del catálogo (base + items subidos desde el panel, añadidos al final).
+ if(wing>=wingFiles.length||hat>=hats.length) throw Error('Invalid appearance');
   const nick=readName(v,14).replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,16)||'Surfer';
   return {character:v.getUint8(12),board:v.getUint8(13),wing,hat,nick};
 }
 
-// ROOM_REQUEST: 12 modo · 13 mapa · 14..19 código · 20 capacidad · 21 bots (22 bytes; 21 = formato anterior sin bots).
-export function roomRequest(mode,mapId=0,code='',capacity=8,bots=null){
- const v=packet(TYPE.ROOM_REQUEST,bots===null?21:22);v.setUint8(12,mode);v.setUint8(13,mapId);v.setUint8(20,capacity);if(bots!==null)v.setUint8(21,bots);
+// ROOM_REQUEST: 12 modo · 13 mapa · 14..19 código · 20 capacidad · 21 bots · 22 privada.
+// Tamaño: 21 bytes (sin bots) · 22 (+ bots en el byte 21) · 23 (+ privada en el byte 22:
+// la sala no aparece en Buscar salas y solo se entra con su código).
+export function roomRequest(mode,mapId=0,code='',capacity=8,bots=null,isPrivate=false){
+ const size=isPrivate?23:bots===null?21:22;
+ const v=packet(TYPE.ROOM_REQUEST,size);v.setUint8(12,mode);v.setUint8(13,mapId);v.setUint8(20,capacity);if(size>21)v.setUint8(21,bots|0);if(size>22)v.setUint8(22,1);
  for(let i=0;i<6;i++)v.setUint8(14+i,code.charCodeAt(i)||0);return v.buffer;
 }
 // ROOM_STATE: 12 anfitrión · 16..21 código · 22 mapa · 23 en carrera · 24 capacidad · 25 bots pedidos por el anfitrión.

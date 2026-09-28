@@ -7,6 +7,8 @@
 //   npm run admin -- give-item <userId> <itemId> "<motivo>"   entrega un item (p. ej. wing:5)
 //   npm run admin -- trades <userId>                    últimos trades de la cuenta
 //   npm run admin -- trade-revert <tradeId>             deshace un trade completado
+//   npm run admin -- admin-user <usuario> <contraseña>  crea (o cambia la contraseña de) un
+//                                                       administrador del panel /admin
 //
 // Cada ajuste queda en wallet_transactions como ADMIN_ADJUSTMENT con su motivo; los trades y
 // sus reversiones, en item_transfers.
@@ -15,6 +17,7 @@ import {fileURLToPath} from 'node:url';
 import {openDatabase, syncCatalog, loadEconomyConfig} from '../src/db.js';
 import {createEconomy} from '../src/economy.js';
 import {createTrade} from '../src/trade.js';
+import {createAdmin} from '../src/admin.js';
 
 const envFile = fileURLToPath(new URL('../.env', import.meta.url));
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -39,6 +42,15 @@ if (command === 'users') {
   console.log(`OK · ${currency} de ${userId}: ${balance}`);
 } else if (command === 'history') {
   console.table(await economy.transactions(args[0], 50));
+} else if (command === 'admin-user') {
+  const [username, password] = args;
+  try {
+    const result = await createAdmin(db, {economy, trade, config, uploadsDir: '.'}).setUser(username, password);
+    console.log(`OK · administrador ${result.username} ${result.created ? 'creado' : 'actualizado (contraseña nueva; se cerraron sus sesiones)'}. Entra en /admin`);
+  } catch (error) {
+    console.error('No se pudo:', {invalid_username: 'usuario de 3 a 32 caracteres (letras, números, punto, guion o guion bajo)', weak_password: 'la contraseña debe tener al menos 10 caracteres'}[error.code] || error.code || error.message);
+    process.exitCode = 1;
+  }
 } else if (command === 'give-item') {
   const [userId, id, ...reason] = args;
   if (!await economy.getUser(userId)) { console.error('No existe la cuenta', userId); await db.close(); process.exit(1); }
@@ -51,6 +63,7 @@ if (command === 'users') {
   catch (error) { console.error('No se pudo:', error.code || error.message, error.detail ? JSON.stringify(error.detail) : ''); process.exitCode = 1; }
 } else {
   console.log('Uso: npm run admin -- users | grant <userId> <NORMAL_COIN|GOLD_COIN> <cantidad> "<motivo>" | history <userId>\n' +
-    '                        | give-item <userId> <itemId> "<motivo>" | trades <userId> | trade-revert <tradeId>');
+    '                        | give-item <userId> <itemId> "<motivo>" | trades <userId> | trade-revert <tradeId>\n' +
+    '                        | admin-user <usuario> <contraseña>');
 }
 await db.close();

@@ -20,7 +20,7 @@ export class SurfNetwork {
             this.serverVersion=v.byteLength<17?1:v.getUint8(16);
             this.legacyServer=this.serverVersion<2;
             if(this.legacyServer)console.warn('[surf] el servidor usa el protocolo anterior: reinícialo para sincronizar las wings entre jugadores.');
-            ws.send(profilePacket(profile,this.legacyServer));ws.send(roomRequest(options.mode,options.mapId||0,options.code||'',options.capacity||8,this.supportsBots&&options.mode===1?(options.bots|0):null)); return; }
+            ws.send(profilePacket(profile,this.legacyServer));ws.send(roomRequest(options.mode,options.mapId||0,options.code||'',options.capacity||8,this.supportsBots&&options.mode===1?(options.bots|0):null,this.supportsBots&&options.mode===1&&!!options.private)); return; }
           if(type===TYPE.ROOM_STATE){this.room=readRoom(v);this.onRoom?.(this.room,[]);return;}
           if(type===TYPE.ERROR){clearTimeout(timeout);reject(Error(v.byteLength>12&&v.getUint8(12)===2?'Este circuito estará disponible próximamente.':'Sala no disponible: revisa el codigo, puede estar llena o haber comenzado.'));this.close();return;}
           if(type===TYPE.POWER_WORLD){this.powerWorld=readPowerWorld(v);return;}

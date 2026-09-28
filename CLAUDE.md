@@ -6,4 +6,5 @@
 - El servidor es la autoridad de saldos, precios, propiedad y resultados: no muevas esa lógica al navegador.
 - Esquema de base de datos: solo con migraciones nuevas en `servidor/migrations/` (nunca editar una ya aplicada ni usar `DROP TABLE` sobre datos reales).
 - No cambiar los índices del catálogo (`client/src/shared/catalog.js`, `board-cosmetics.js`): los usan Babylon.js y el protocolo.
+- Catálogo: los items subidos desde el panel `/admin` viven en la base (`custom_items`) y se añaden AL FINAL de las listas de `catalog.js` con `applyCustomItems`; sus imágenes en `servidor/data/uploads` (fuera de git).
 - Secretos solo en `servidor/.env` (ignorado por git). Plantilla: `servidor/.env.example`.
