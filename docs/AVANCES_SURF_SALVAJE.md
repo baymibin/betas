@@ -501,6 +501,14 @@ Intercambio de **items por items, sin monedas**, solo entre **cuentas registrada
     - al soltar, el surfista se queda donde está;
     - mover el ratón de verdad al borde sigue dirigiendo.
   - En una sala en línea con A/D pulsada, el surfista llega a los dos bordes (x = ±10), y la predicción y el servidor coinciden.
+- **Diagnóstico de controles:**
+  - Abrir el juego con `?debug` (por ejemplo `https://tu-dominio/?debug`) muestra en la carrera un recuadro con:
+    - la versión del cliente (`CLIENT_BUILD`, también en la consola como `[surf] cliente ...`);
+    - si el juego ve pulsadas izquierda/derecha y el giro aplicado, con su origen (teclado o ratón);
+    - la posición x frente al límite;
+    - los contadores de keydown / repeticiones / keyup / blur, y el último evento.
+  - Sirve para ver en el equipo del jugador por qué se frena al mantener A/D: en Chromium (práctica y en línea, también con la repetición de teclas) se llega de borde a borde.
+  - **PENDIENTE:** el jugador informa de que en su equipo se sigue frenando a ~1 s. Falta su captura con `?debug`.
 - **Salas:**
   - el interruptor **Privada** ahora sí llega al servidor (byte 22 de ROOM_REQUEST). Una sala privada no aparece en "Buscar salas" y solo se entra con su código;
   - el código se muestra con una nota explicativa y queda más separado del botón "Crear sala de espera";
@@ -658,6 +666,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Diagnóstico de controles (?debug) y versión del cliente
+- Recuadro en pantalla con teclas, origen del giro, x y límite, y eventos de teclado. Sirve para localizar en el equipo del jugador el frenazo al mantener A/D, que no se reproduce en Chromium.
 
 ### 2026-09-28 · Moverse a los lados: el ratón ya no interfiere con A/D
 - El ratón solo dirige con un movimiento claro (≥ 24 px). Comprobado en práctica y en línea que A/D llevan de borde a borde.
