@@ -7,6 +7,8 @@
 //   GET  /api/coins/packages · POST /api/coins/exchange · GET /api/wallet/transactions
 //   GET  /api/payments/products · POST /api/payments/checkout · POST /api/payments/webhook/:provider
 //   POST /api/account/nickname · POST /api/account/unlink · POST /api/account/migrate-local
+//   GET  /api/trade/summary · /api/trade/inventory · /api/trade/user?code= · /api/trade/offers?box= · /api/trade/blocked
+//   POST /api/trade/offers · /api/trade/accept · /api/trade/decline · /api/trade/cancel · /api/trade/block · /api/trade/unblock
 // Toda petición que cambia algo exige sesión + cabecera X-CSRF-Token + Origin propio.
 import {EconomyError} from './economy.js';
 import {SESSION_COOKIE, BROWSER_COOKIE} from './auth.js';
@@ -33,7 +35,7 @@ export function createRateLimiter(limits) {
   };
 }
 
-export function mountApi(app, {auth, economy, config, onEquipmentChanged = () => {}, payments = {enabled: false}}) {
+export function mountApi(app, {auth, economy, trade, config, onEquipmentChanged = () => {}, payments = {enabled: false}}) {
   // Por IP y minuto. En una LAN varios jugadores comparten IP, por eso no es muy estricto.
   const env = process.env;
   const allow = createRateLimiter({auth: Number(env.RATE_LIMIT_AUTH) || 60, write: Number(env.RATE_LIMIT_WRITE) || 120, read: Number(env.RATE_LIMIT_READ) || 600});
@@ -107,7 +109,7 @@ export function mountApi(app, {auth, economy, config, onEquipmentChanged = () =>
     return {
       authenticated: true, csrf: null,
       user: {id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, createdAt: user.createdAt, localMigrated: !!user.localMigrated},
-      identities: await auth.identities(userId), wallet: await economy.wallet(userId),
+      identities: await auth.identities(userId), wallet: await economy.wallet(userId), tradeCode: trade ? await trade.code(userId) : null,
       inventory: await economy.inventory(userId), equipped: await economy.equipped(userId)
     };
   };
@@ -176,6 +178,30 @@ export function mountApi(app, {auth, economy, config, onEquipmentChanged = () =>
   // ---------- Conseguir monedas ----------
   route('get', '/api/coins/packages', async () => ({json: {packages: await economy.packages()}}));
   route('post', '/api/coins/exchange', async ctx => ({json: await economy.exchange(ctx.userId, String(ctx.body.packageId || ''), ctx.body.requestId)}), {group: 'write'});
+
+  // ---------- Trade (solo cuentas registradas; items por items, sin monedas) ----------
+  if (trade) {
+    const need = ctx => { if (!ctx.userId) throw new EconomyError('login_required', 401); return ctx.userId; };
+    const str = v => String(v ?? '');
+    route('get', '/api/trade/summary', async ctx => ({json: await trade.summary(need(ctx))}));
+    route('get', '/api/trade/inventory', async ctx => ({json: {items: await trade.inventory(need(ctx))}}));
+    route('get', '/api/trade/user', async ctx => ({json: await trade.partner(need(ctx), str(ctx.query.code))}));
+    route('get', '/api/trade/offers', async ctx => ({json: {offers: await trade.list(need(ctx), str(ctx.query.box || 'received'))}}));
+    route('get', '/api/trade/blocked', async ctx => ({json: {blocked: await trade.blocked(need(ctx))}}));
+    route('post', '/api/trade/offers', async ctx => ({json: await trade.create(ctx.userId, {toCode: ctx.body.toCode, offer: ctx.body.offer, request: ctx.body.request,
+      requestId: ctx.body.requestId, parentId: ctx.body.parentId ? str(ctx.body.parentId) : null})}), {group: 'write'});
+    route('post', '/api/trade/accept', async ctx => {
+      const result = await trade.accept(ctx.userId, str(ctx.body.offerId), str(ctx.body.contentHash));
+      // Lo entregado se desequipa: las salas abiertas de las dos cuentas se actualizan.
+      for (const user of result.users || []) onEquipmentChanged(user);
+      const {users, ...json} = result;
+      return {json: {...json, wallet: await economy.wallet(ctx.userId)}};
+    }, {group: 'write'});
+    route('post', '/api/trade/decline', async ctx => ({json: await trade.decline(ctx.userId, str(ctx.body.offerId))}), {group: 'write'});
+    route('post', '/api/trade/cancel', async ctx => ({json: await trade.cancel(ctx.userId, str(ctx.body.offerId))}), {group: 'write'});
+    route('post', '/api/trade/block', async ctx => ({json: await trade.block(ctx.userId, str(ctx.body.code))}), {group: 'write'});
+    route('post', '/api/trade/unblock', async ctx => ({json: await trade.unblock(ctx.userId, str(ctx.body.code))}), {group: 'write'});
+  }
 
   // ---------- Pagos reales (preparado, deshabilitado) ----------
   route('get', '/api/payments/products', async () => ({json: {enabled: !!payments.enabled, products: await economy.goldProducts()}}));

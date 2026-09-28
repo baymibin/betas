@@ -2,7 +2,29 @@
   "_comment": "Configuración central de la economía de Surf Salvaje. El servidor la aplica al arrancar (sin borrar datos). Precios en unidades enteras. null = sin precio definido: el paquete/producto queda INACTIVO.",
 
   "itemPrices": {
-    "_comment": "Precio en Tablas Normales por artículo (id = categoria:indice, p. ej. \"wing:5\"). Los que no aparecen cuestan 0 = gratis para todos, como hasta ahora."
+    "_comment": "Precio en Tablas Normales por artículo (id = categoria:indice, p. ej. \"wing:5\"). Los que no aparecen cuestan 0 = gratis para todos: Classic (character:0), Ola Tropical (board:0), Angel Wings (wing:0) y Sin hat (hat:0).",
+    "character:1": 300, "character:2": 300, "character:3": 300, "character:4": 300,
+    "board:1": 600, "board:2": 600, "board:3": 600, "board:4": 1000, "board:5": 1000,
+    "wing:1": 600, "wing:2": 600, "wing:3": 600, "wing:4": 600,
+    "wing:5": 1000, "wing:6": 1000, "wing:7": 1500, "wing:8": 1500
+  },
+
+  "itemRarity": {
+    "_comment": "Etiqueta de rareza que se muestra en la tienda y en el Trade: common, rare, epic o legendary. Los que no aparecen son common.",
+    "board:1": "rare", "board:2": "rare", "board:3": "rare", "board:4": "epic", "board:5": "epic",
+    "wing:1": "rare", "wing:2": "rare", "wing:3": "rare", "wing:4": "rare",
+    "wing:5": "epic", "wing:6": "epic", "wing:7": "legendary", "wing:8": "legendary"
+  },
+
+  "trade": {
+    "_comment": "Trade: intercambio de items por items (sin monedas) entre cuentas registradas. Solo items poseídos y no gratuitos. minAccountAgeHours = antigüedad mínima de la cuenta para usarlo (0 para pruebas locales). dailyTradeLimit = trades completados por cuenta y día (UTC). untradeable = ids que nunca se pueden intercambiar.",
+    "enabled": true,
+    "maxItemsPerSide": 4,
+    "maxOpenOffers": 10,
+    "offerTTLHours": 72,
+    "minAccountAgeHours": 24,
+    "dailyTradeLimit": 20,
+    "untradeable": []
   },
 
   "rewards": {

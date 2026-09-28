@@ -97,8 +97,8 @@ export function createEconomy(db, config = {}) {
     const row = await r.get('SELECT id, category, asset_index AS assetIndex, name, description, asset, price_normal AS price, available FROM shop_items WHERE id = ?', [id]);
     return row && {...row, assetIndex: num(row.assetIndex), price: num(row.price), available: num(row.available)};
   }
-  const owns = async (userId, id, r = db) => !!(await r.get('SELECT 1 AS ok FROM user_inventory WHERE user_id = ? AND item_id = ?', [userId, id]));
-  const inventory = async (userId, r = db) => r.all('SELECT item_id AS itemId, source, acquired_at AS acquiredAt FROM user_inventory WHERE user_id = ? ORDER BY acquired_at', [userId]);
+  const owns = async (userId, id, r = db) => !!(await r.get('SELECT 1 AS ok FROM user_inventory_v2 WHERE user_id = ? AND item_id = ?', [userId, id]));
+  const inventory = async (userId, r = db) => r.all('SELECT item_id AS itemId, source, acquired_at AS acquiredAt FROM user_inventory_v2 WHERE user_id = ? ORDER BY acquired_at', [userId]);
   // ¿Puede esta cuenta (o un invitado, userId = null) usar el artículo? Gratis o comprado.
   async function canUse(userId, slot, index, r = db) {
     const item = await itemRow(itemId(slot, index), r);
@@ -118,8 +118,14 @@ export function createEconomy(db, config = {}) {
     const owned = new Set(userId ? (await inventory(userId)).map(i => i.itemId) : []);
     return (await db.all('SELECT id, category, asset_index AS assetIndex, name, description, asset, price_normal AS price FROM shop_items WHERE available = 1 ORDER BY sort_order'))
       .map(row => ({...row, assetIndex: num(row.assetIndex), price: num(row.price)}))
-      .map(row => ({...row, free: row.price === 0, owned: row.price === 0 || owned.has(row.id), equipped: !!eq && eq[row.category] === row.assetIndex}));
+      .map(row => ({...row, free: row.price === 0, owned: row.price === 0 || owned.has(row.id), equipped: !!eq && eq[row.category] === row.assetIndex,
+        rarity: rarity(row.id), tradeable: tradeable(row.id, row.price)}));
   }
+  // Rareza (solo presentación, desde economy.json) y si el item puede ir en un trade: los
+  // gratuitos no (todo el mundo los tiene), ni los que la configuración excluya.
+  const RARITIES = ['common', 'rare', 'epic', 'legendary'];
+  function rarity(id) { const r = config.itemRarity?.[id]; return RARITIES.includes(r) ? r : 'common'; }
+  function tradeable(id, price = priceCache.get(id)?.price) { return price > 0 && !(config.trade?.untradeable || []).includes(id); }
   async function equip(userId, id, r = db) {
     const parsed = parseItemId(id), item = parsed && await itemRow(id, r);
     if (!item || !item.available) throw new EconomyError('item_not_found', 404);
@@ -136,7 +142,7 @@ export function createEconomy(db, config = {}) {
         // Primero se bloquea el monedero: las compras de una misma cuenta van de una en una y
         // todo lo que se lee después (repetición, propiedad) ya incluye la compra anterior.
         await lockWallet(t, userId, NORMAL);
-        const previous = await t.get('SELECT item_id FROM item_purchases WHERE user_id = ? AND request_id = ?', [userId, requestId]);
+        const previous = await t.get('SELECT item_id FROM item_purchases_v2 WHERE user_id = ? AND request_id = ?', [userId, requestId]);
         if (previous) {
           if (previous.item_id !== id) throw new EconomyError('request_id_reused', 409);
           return {itemId: id, replayed: true, wallet: await wallet(userId, t)};
@@ -146,15 +152,15 @@ export function createEconomy(db, config = {}) {
         if (item.price === 0) throw new EconomyError('item_is_free', 409);
         if (await owns(userId, id, t)) throw new EconomyError('already_owned', 409);
         await move(userId, NORMAL, -item.price, 'ITEM_PURCHASE', 'purchase:' + requestId, item.name, t);
-        await t.run('INSERT INTO user_inventory (user_id, item_id, source, reference) VALUES (?, ?, ?, ?)', [userId, id, 'PURCHASE', requestId]);
-        await t.run('INSERT INTO item_purchases (user_id, item_id, price_normal, request_id) VALUES (?, ?, ?, ?)', [userId, id, item.price, requestId]);
+        await t.run('INSERT INTO user_inventory_v2 (user_id, item_id, source, reference) VALUES (?, ?, ?, ?)', [userId, id, 'PURCHASE', requestId]);
+        await t.run('INSERT INTO item_purchases_v2 (user_id, item_id, price_normal, request_id) VALUES (?, ?, ?, ?)', [userId, id, item.price, requestId]);
         return {itemId: id, replayed: false, price: item.price, wallet: await wallet(userId, t)};
       });
     } catch (error) {
       // Dos peticiones simultáneas con el mismo requestId: la segunda choca con la restricción
       // única; se responde como repetición, sin cobrar dos veces.
       if (error instanceof EconomyError && error.code === 'duplicate_operation' || isUniqueViolation(error)) {
-        if (await db.get('SELECT 1 AS ok FROM item_purchases WHERE user_id = ? AND request_id = ?', [userId, requestId])) return {itemId: id, replayed: true, wallet: await wallet(userId)};
+        if (await db.get('SELECT 1 AS ok FROM item_purchases_v2 WHERE user_id = ? AND request_id = ?', [userId, requestId])) return {itemId: id, replayed: true, wallet: await wallet(userId)};
         if (await owns(userId, id)) throw new EconomyError('already_owned', 409);
       }
       throw error;
@@ -230,6 +236,17 @@ export function createEconomy(db, config = {}) {
     return move(userId, currency, amount, 'ADMIN_ADJUSTMENT', 'admin:' + reference, String(reason).slice(0, 200));
   }
 
+  // Entrega un item (p. ej. premio de un evento o para probar el Trade). Solo consola.
+  async function adminGiveItem(userId, id, reason) {
+    if (!String(reason || '').trim()) throw new EconomyError('reason_required');
+    const item = parseItemId(id) && await itemRow(id);
+    if (!item || !item.available) throw new EconomyError('item_not_found', 404);
+    if (item.price === 0) throw new EconomyError('item_is_free', 409);
+    if (await owns(userId, id)) throw new EconomyError('already_owned', 409);
+    await db.run('INSERT INTO user_inventory_v2 (user_id, item_id, source, reference) VALUES (?, ?, ?, ?)', [userId, id, 'ADMIN', String(reason).slice(0, 120)]);
+    return inventory(userId);
+  }
+
   // ---------- Pagos reales (preparado; sin proveedor integrado no se acredita nada) ----------
   const goldProducts = async () => (await db.all('SELECT id, name, gold_amount AS goldAmount, price_minor AS priceMinor, price_currency AS currency, active FROM payment_products ORDER BY sort_order'))
     .map(row => ({...row, goldAmount: num(row.goldAmount), priceMinor: row.priceMinor === null ? null : num(row.priceMinor), active: !!num(row.active)}));
@@ -262,6 +279,6 @@ export function createEconomy(db, config = {}) {
     });
   }
 
-  return {loadCache, isFree, createUser, getUser, setNickname, wallet, move, transactions, catalog, inventory, equipped, equip, canUse,
-    purchase, packages, exchange, rewardAmount, rewardRace, adminAdjust, goldProducts, creditPaidOrder, migrateLocal};
+  return {loadCache, isFree, rarity, tradeable, itemRow, owns, lockWallet, createUser, getUser, setNickname, wallet, move, transactions, catalog, inventory, equipped, equip, canUse,
+    purchase, packages, exchange, rewardAmount, rewardRace, adminAdjust, adminGiveItem, goldProducts, creditPaidOrder, migrateLocal};
 }

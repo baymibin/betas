@@ -45,6 +45,7 @@ function itemState(slot,id){
   const action=equipped?'equipped':usable?'equip':!account.authenticated?'login':canAfford?'buy':'poor';
   return {...info,equipped,usable,action};
 }
+const RARITY_NAMES={common:'COMÚN',rare:'RARO',epic:'ÉPICO',legendary:'LEGENDARIO'};
 const ACTION_TEXT={equipped:'✓ EQUIPADO',equip:'EQUIPAR',buy:'COMPRAR',poor:'SALDO INSUFICIENTE',login:'INICIA SESIÓN'};
 function renderWallet(){
   const box=document.getElementById('shop-wallet');if(!box)return;
@@ -151,7 +152,7 @@ function render(){
   grid.scrollTop=scroll;
   const st=itemState(prop,chosen);
   detailName.textContent=itemName(prop,chosen);
-  detailRarity.textContent=st.free?'COMÚN':`${formatCoins(st.price)} TABLAS NORMALES`;
+  detailRarity.textContent=(RARITY_NAMES[st.rarity]||'COMÚN')+(st.free?' · GRATIS':` · ${formatCoins(st.price)} TABLAS NORMALES`);
   detailDescription.textContent=descriptions[prop][chosen];
   detailEquip.textContent=st.action==='buy'?`COMPRAR · ${formatCoins(st.price)}`:ACTION_TEXT[st.action];
   detailEquip.className=st.action==='buy'||st.action==='login'?'is-buy':st.action==='poor'?'is-poor':'';

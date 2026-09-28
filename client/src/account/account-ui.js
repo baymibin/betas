@@ -3,6 +3,7 @@
 // proveedor a través del servidor. Sin sesión se sigue jugando como invitado.
 import {account, refresh, login, logout, setNickname, consumeAuthRedirect, message, formatCoins, providerName, DEFAULT_AVATAR} from './account.js';
 import './profile-ui.js';
+import './trade-ui.js';
 
 const $ = id => document.getElementById(id);
 

@@ -4,7 +4,7 @@
 import {profile} from '../ui/shop.js';
 
 const state = {loaded: false, authenticated: false, providers: {google: false, discord: false}, payments: {enabled: false},
-  user: null, identities: [], wallet: {NORMAL_COIN: 0, GOLD_COIN: 0}, inventory: [], equipped: null, csrf: null};
+  user: null, identities: [], wallet: {NORMAL_COIN: 0, GOLD_COIN: 0}, inventory: [], equipped: null, csrf: null, tradeCode: null};
 export const account = state;
 const emit = () => document.dispatchEvent(new CustomEvent('surf:account', {detail: state}));
 
@@ -27,6 +27,24 @@ export const MESSAGES = {
   rate_limited: 'Demasiados intentos. Espera un momento.',
   csrf_failed: 'La sesión no es válida. Recarga la página.',
   invalid_nickname: 'Ese nick no es válido.',
+  trade_disabled: 'El Trade está desactivado en este momento.',
+  account_too_new: 'Tu cuenta es muy nueva: podrás hacer trades en unas horas.',
+  invalid_code: 'Ese código de surfista no es válido (ej.: SURF-4F7KQ).',
+  user_not_found: 'No hay ningún surfista con ese código.',
+  trade_self: 'No puedes hacer un trade contigo mismo.',
+  trade_blocked: 'No puedes hacer trades con este surfista.',
+  invalid_items: 'Elige al menos un item en cada lado (máximo 4).',
+  item_not_tradeable: 'Ese item no se puede intercambiar.',
+  not_owned: 'Uno de los items ya no está en el inventario de su dueño.',
+  too_many_offers: 'Tienes demasiadas ofertas abiertas. Cancela alguna antes.',
+  offer_exists: 'Ya enviaste esa misma oferta a este surfista.',
+  offer_not_found: 'Esa oferta ya no existe.',
+  offer_closed: 'Esa oferta ya no está abierta.',
+  offer_changed: 'La oferta cambió. Vuelve a revisarla.',
+  offer_expired: 'La oferta caducó.',
+  items_changed: 'Los items de la oferta cambiaron de dueño: ya no es válida.',
+  daily_trade_limit: 'Se alcanzó el máximo de trades por hoy.',
+  network: 'Sin conexión con el servidor.',
   server_error: 'Error del servidor. Inténtalo de nuevo.'
 };
 export const message = code => MESSAGES[code] || 'No se pudo completar la acción.';
@@ -58,7 +76,7 @@ export async function refresh() {
     const me = await api('/api/me');
     Object.assign(state, {loaded: true, authenticated: !!me.authenticated, providers: me.providers || state.providers, payments: me.payments || state.payments});
     if (me.authenticated) {
-      Object.assign(state, {user: me.user, identities: me.identities, wallet: me.wallet, inventory: me.inventory, equipped: me.equipped, csrf: me.csrf});
+      Object.assign(state, {user: me.user, identities: me.identities, wallet: me.wallet, inventory: me.inventory, equipped: me.equipped, csrf: me.csrf, tradeCode: me.tradeCode || null});
       profile.nick = me.user.nickname;
       const nick = document.getElementById('nickname');
       if (nick && document.activeElement !== nick) nick.value = me.user.nickname;
@@ -71,7 +89,7 @@ export async function refresh() {
       }
       applyEquipment(state.equipped);
     } else {
-      Object.assign(state, {user: null, identities: [], wallet: {NORMAL_COIN: 0, GOLD_COIN: 0}, inventory: [], equipped: null, csrf: null});
+      Object.assign(state, {user: null, identities: [], wallet: {NORMAL_COIN: 0, GOLD_COIN: 0}, inventory: [], equipped: null, csrf: null, tradeCode: null});
     }
   } catch {
     state.loaded = true;   // sin servidor de cuentas se sigue pudiendo jugar como invitado
@@ -107,6 +125,25 @@ export async function exchange(packageId, id = requestId()) {
 }
 export const transactions = (limit = 30) => api('/api/wallet/transactions?limit=' + limit);
 export const goldProducts = () => api('/api/payments/products');
+
+// ---------- Trade (items por items, solo con cuenta). El servidor valida todo. ----------
+export const trade = {
+  summary: () => api('/api/trade/summary'),
+  inventory: () => api('/api/trade/inventory'),
+  user: code => api('/api/trade/user?code=' + encodeURIComponent(code)),
+  offers: box => api('/api/trade/offers?box=' + box),
+  blocked: () => api('/api/trade/blocked'),
+  create: ({toCode, offer, request, parentId = null}, id = requestId()) => api('/api/trade/offers', {method: 'POST', body: {toCode, offer, request, parentId, requestId: id}}),
+  async accept(offerId, contentHash) {
+    const r = await api('/api/trade/accept', {method: 'POST', body: {offerId, contentHash}});
+    await refresh();   // cambian inventario y equipamiento
+    return r;
+  },
+  decline: offerId => api('/api/trade/decline', {method: 'POST', body: {offerId}}),
+  cancel: offerId => api('/api/trade/cancel', {method: 'POST', body: {offerId}}),
+  block: code => api('/api/trade/block', {method: 'POST', body: {code}}),
+  unblock: code => api('/api/trade/unblock', {method: 'POST', body: {code}})
+};
 
 // Formato de saldos: 2,500 (enteros, sin decimales).
 export const formatCoins = n => Math.max(0, Math.floor(Number(n) || 0)).toLocaleString('en-US');

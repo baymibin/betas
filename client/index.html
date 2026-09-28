@@ -274,7 +274,7 @@
     align-items:center; justify-content:center; text-align:center;
   }
 </style>
-<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css"><link rel="stylesheet" href="/styles/account.css"><link rel="stylesheet" href="/styles/profile.css"><link rel="stylesheet" href="/styles/settings.css">
+<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css"><link rel="stylesheet" href="/styles/account.css"><link rel="stylesheet" href="/styles/profile.css"><link rel="stylesheet" href="/styles/settings.css"><link rel="stylesheet" href="/styles/trade.css">
 </head>
 <body>
 <div id="loading" role="status" aria-live="polite" aria-busy="true">
@@ -327,6 +327,7 @@
   <button id="home-battle" class="nav-item selected" aria-current="page"><img data-src="/assets/images/menu/menu-wave.png" alt=""><span>Jugar</span></button>
   <button id="home-profile" class="nav-item"><img data-src="/assets/images/menu/menu-profile.png" alt=""><span>Perfil</span></button>
   <button id="shop-btn" class="nav-item"><img data-src="/assets/images/menu/menu-shop.png" alt=""><span>Tienda</span></button>
+  <button id="home-trade" class="nav-item trade-nav"><img data-src="/assets/images/menu/menu-trade.webp" alt=""><span>Trade</span><b id="home-trade-badge" class="nav-badge" hidden></b></button>
   <button id="home-rooms" class="nav-item"><img data-src="/assets/images/menu/menu-rooms.png" alt=""><span>Salas</span></button>
   <button id="home-settings" class="nav-item settings-nav"><span class="gear" aria-hidden="true">⚙</span><span>Ajustes</span></button>
  </nav>
@@ -404,6 +405,40 @@
     </footer>
   </div>
 </dialog>
+<dialog id="trade-dialog" class="trade-dialog" aria-labelledby="trade-title">
+  <div class="trade-shell">
+    <header class="trade-header">
+      <div class="trade-heading">
+        <span class="trade-kicker"><span aria-hidden="true">🌴</span> SURF CLUB · TRADE</span>
+        <h2 id="trade-title" class="trade-title">Trade <img data-src="/assets/images/menu/menu-trade.webp" alt=""></h2>
+        <p class="trade-sub">Intercambia tus items con otros surfistas.</p>
+      </div>
+      <div id="trade-mycode" class="trade-mycode"></div>
+      <button class="dialog-close profile-close trade-close" type="button" aria-label="Cerrar Trade">×</button>
+    </header>
+    <nav id="trade-tabs" class="trade-tabs" aria-label="Secciones del Trade"></nav>
+    <div class="trade-body">
+      <section id="trade-new" class="trade-new">
+        <div class="trade-panel trade-items">
+          <div id="trade-source" class="trade-source"></div>
+          <div id="trade-filters" class="trade-filters"></div>
+          <div id="trade-grid" class="trade-grid"></div>
+        </div>
+        <div id="trade-builder" class="trade-panel trade-builder"></div>
+        <aside class="trade-panel trade-detail" aria-label="Vista del item">
+          <h3 class="trade-panel-title">Vista del item</h3>
+          <div class="trade-stage"><canvas id="trade-preview-canvas" aria-label="Vista 3D del item"></canvas></div>
+          <div id="trade-detail-info" class="trade-detail-info"></div>
+          <div id="trade-summary" class="trade-summary"></div>
+        </aside>
+      </section>
+      <section id="trade-list" class="trade-list" hidden></section>
+      <section id="trade-gate" class="trade-gate" hidden></section>
+    </div>
+    <div id="trade-confirm" class="trade-confirm" hidden></div>
+  </div>
+</dialog>
+
 <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
   <div class="settings-shell">
     <button class="dialog-close profile-close" type="button" aria-label="Cerrar ajustes">×</button>
