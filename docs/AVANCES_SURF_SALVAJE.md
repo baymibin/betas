@@ -305,6 +305,48 @@ Pruebas (Playwright, servidor real, cuenta de prueba creada con `loginIdentity` 
 
 Pendiente: avatar propio para invitados (hoy se usa el genérico); hats reales en el equipamiento cuando existan; el sprite de wings de la tarjeta muestra el primer fotograma (sin animación).
 
+## Remasterización del modal Ajustes (2026-09-28)
+
+**IMPLEMENTADO · PROBADO en navegador (Chromium) a 1274×716, 1366×768, 1672×941 y 390×844.**
+
+Cambio **solo de presentación**. Los controles conservan sus `id`, así que `home-ui.js` (lectura, guardado y aplicación), `core/settings.js` (persistencia en `localStorage`, clave `surf.settings.v1`) y el audio (`categoryGain` = general × categoría, aplicado una sola vez) siguen **sin cambios**.
+
+- **Modal:** `width:min(90vw,950px)`, `max-height:94dvh`, radio de 26 px, borde turquesa y cristal azul petróleo sobre `shop-bg-tropical.webp`. El `::backdrop` usa el mismo paisaje con `blur(7px) saturate(.9)` y un velo azul petróleo. Dos siluetas tropicales (hibisco y hojas) como capas del fondo con opacidad del 6-8 %, sin imágenes nuevas y sin crear desbordamiento.
+- **Cabecera:** "A TU MANERA", título "Ajustes 🌊" (emoji, como pediste) y el mismo botón × circular del Perfil (`.profile-close`).
+- **Tarjetas:**
+  - **Sonido:** icono de altavoz en dorado y casilla.
+  - **Ajustes de audio:** 4 filas con la estructura [icono] [nombre] [slider] [porcentaje], separadas por líneas turquesa tenues:
+    - Volumen general (altavoz);
+    - Música (nota);
+    - Ambiente (ola);
+    - Efectos (destellos).
+  - **Efectos visuales:** icono de ojo y casilla.
+  - **Calidad gráfica:** icono de monitor, select con flecha y la nota informativa debajo.
+- **Sliders:** pista azul petróleo, tramo activo con degradado turquesa → aqua → amarillo (`--fill`, lo actualiza `home-ui.js`; en Firefox, `::-moz-range-progress`) y thumb dorado con borde claro, brillo y anillo de foco para teclado. El porcentaje real se actualiza en tiempo real.
+- **Casillas:** cuadrado turquesa con marca blanca (`appearance:none`), foco visible.
+- **Iconos:** SVG en línea (altavoz, nota, ola, destellos, ojo y monitor), sin librerías.
+- **Responsive:** en escritorio no hay scroll interno ni horizontal; en pantallas bajas se compacta; por debajo de 640 px cada slider pasa a su propia fila, el select ocupa todo el ancho y el modal hace scroll vertical.
+- **Perfil:** el icono del título "Mi surfer" pasa a ser el emoji 🌊 (antes era una imagen).
+
+Archivos:
+- Creado: `client/styles/settings.css`.
+- Modificados: `client/index.html` (marcado del modal Ajustes, título del Perfil y enlace a `settings.css`) y `client/styles/profile.css` (estilo del emoji).
+- Sin cambios: `home-ui.js`, `settings.js`, `audio.js` y el juego.
+
+Pruebas (Playwright, 12 comprobaciones OK):
+- valores reales por defecto (100/70/80/90);
+- cada slider actualiza porcentaje y relleno al instante, también con teclado;
+- volumen efectivo = general × categoría;
+- Efectos visuales aplica `effects-off`;
+- Sonido desactivado silencia todo;
+- Calidad cambia y conserva los 3 presets;
+- tras **F5** se recuperan volúmenes, casillas y calidad;
+- la × cierra el modal;
+- 0 errores de consola.
+- `npm test` 60/60.
+
+Problemas encontrados: el porcentaje "100 %" se partía en dos líneas (columna ampliada y `nowrap`), y las decoraciones hechas con pseudo-elementos que salían del borde generaban scroll interno (pasaron a ser capas de fondo).
+
 ## 21. Archivos modificados (esta fase)
 
 - `client/index.html`: logo SVG, panel de acceso, botones de Google y Discord, datos con iconos, perfil y tienda (monedero, pestaña Conseguir monedas).
@@ -419,6 +461,9 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 5. Desplegar con HTTPS.
 
 ## 29. Historial
+
+### 2026-09-28 · Remasterización del modal Ajustes
+- Panel horizontal con tarjetas, iconos SVG, sliders turquesa → amarillo con thumb dorado y porcentaje real; misma lógica y persistencia. Título del Perfil con emoji 🌊.
 
 ### 2026-09-27 · Remasterización del perfil "Mi surfer"
 - Nuevo modal panorámico de dos columnas, compartido por invitado y cuenta, con la escena 3D de La tiendita y el equipo real (detalles en la sección "Remasterización del perfil").

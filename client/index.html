@@ -274,7 +274,7 @@
     align-items:center; justify-content:center; text-align:center;
   }
 </style>
-<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css"><link rel="stylesheet" href="/styles/account.css"><link rel="stylesheet" href="/styles/profile.css">
+<link rel="stylesheet" href="/styles/ui.css"><link rel="stylesheet" href="/styles/home.css"><link rel="stylesheet" href="/styles/account.css"><link rel="stylesheet" href="/styles/profile.css"><link rel="stylesheet" href="/styles/settings.css">
 </head>
 <body>
 <div id="loading" role="status" aria-live="polite" aria-busy="true">
@@ -377,7 +377,7 @@
     <div class="profile-layout">
       <section class="profile-left" aria-label="Tu surfer">
         <span class="profile-kicker">TU IDENTIDAD EN EL AGUA</span>
-        <h2 id="profile-title" class="profile-title">Mi surfer <img src="/assets/images/menu/custom_ui/waveIcon.png" alt=""></h2>
+        <h2 id="profile-title" class="profile-title">Mi surfer <span class="profile-title-wave" aria-hidden="true">🌊</span></h2>
         <div class="profile-stage">
           <canvas id="profile-preview-canvas" aria-label="Vista 3D de tu surfer con su tabla y alas"></canvas>
           <div class="profile-identity"><h3 id="profile-name">Surfer</h3><p id="profile-style"></p></div>
@@ -404,17 +404,28 @@
     </footer>
   </div>
 </dialog>
-<dialog id="settings-dialog" class="home-dialog"><button class="dialog-close" aria-label="Cerrar ajustes">×</button><span class="home-eyebrow">A TU MANERA</span><h2>Ajustes</h2>
-<label class="setting-row" for="setting-sound">Sonido <input id="setting-sound" type="checkbox"></label>
-<section class="audio-settings" aria-labelledby="audio-settings-title"><h3 id="audio-settings-title">AJUSTES DE AUDIO</h3>
-<div class="volume-row"><label for="setting-volume">Volumen general</label><output id="setting-volume-value" for="setting-volume">0 %</output><input id="setting-volume" class="volume-slider" type="range" min="0" max="100" step="5"></div>
-<div class="volume-row"><label for="setting-music">Música</label><output id="setting-music-value" for="setting-music">0 %</output><input id="setting-music" class="volume-slider" type="range" min="0" max="100" step="5"></div>
-<div class="volume-row"><label for="setting-ambience">Ambiente</label><output id="setting-ambience-value" for="setting-ambience">0 %</output><input id="setting-ambience" class="volume-slider" type="range" min="0" max="100" step="5"></div>
-<div class="volume-row"><label for="setting-sfx">Efectos</label><output id="setting-sfx-value" for="setting-sfx">0 %</output><input id="setting-sfx" class="volume-slider" type="range" min="0" max="100" step="5"></div>
-</section>
-<label class="setting-row" for="setting-effects">Efectos visuales <input id="setting-effects" type="checkbox"></label>
-<label for="setting-quality">Calidad gráfica</label><select id="setting-quality"><option value="auto">Automática · se adapta a tu equipo</option><option value="high">Alta · PC potente</option><option value="low">Baja · mejor rendimiento</option></select>
-<p class="dialog-note">La calidad baja reduce la resolución, las sombras y el brillo. Los cambios se guardan automáticamente.</p><p id="settings-saved" role="status"></p></dialog>
+<dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+  <div class="settings-shell">
+    <button class="dialog-close profile-close" type="button" aria-label="Cerrar ajustes">×</button>
+    <span class="settings-kicker">A TU MANERA</span>
+    <h2 id="settings-title" class="settings-title">Ajustes <span aria-hidden="true">🌊</span></h2>
+    <label class="settings-card settings-toggle" for="setting-sound"><span class="settings-icon gold" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M3 9.5v5h3.8L12 19V5L6.8 9.5H3Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/></svg></span><span class="settings-label">Sonido</span><input id="setting-sound" class="settings-check" type="checkbox"></label>
+    <section class="settings-card audio-settings" aria-labelledby="audio-settings-title">
+      <h3 id="audio-settings-title">AJUSTES DE AUDIO</h3>
+      <div class="volume-row"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M3 9.5v5h3.8L12 19V5L6.8 9.5H3Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/></svg></span><label for="setting-volume">Volumen general</label><input id="setting-volume" class="volume-slider" type="range" min="0" max="100" step="5"><output id="setting-volume-value" for="setting-volume">0 %</output></div>
+      <div class="volume-row"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M9 17.5a2.5 2.5 0 1 1-2.5-2.5c.5 0 1 .1 1.5.4V5l11-2v12.5a2.5 2.5 0 1 1-2.5-2.5c.5 0 1 .1 1.5.4V7.2l-9 1.7v8.6Z"/></svg></span><label for="setting-music">Música</label><input id="setting-music" class="volume-slider" type="range" min="0" max="100" step="5"><output id="setting-music-value" for="setting-music">0 %</output></div>
+      <div class="volume-row"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17c2 0 2-1.5 4-1.5S8 17 10 17s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M2 20.5c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path class="fill" d="M4 14c.6-4.5 4.4-8 9-8 3.2 0 5.8 2 6 4.6.1 1.7-1.3 3-3 2.6-1.3-.3-1.7-1.8-.7-2.6-1.6-1.3-4.6-.6-5.6 2.1-.4 1-.5 1.9-.4 2.8L4 14Z"/></svg></span><label for="setting-ambience">Ambiente</label><input id="setting-ambience" class="volume-slider" type="range" min="0" max="100" step="5"><output id="setting-ambience-value" for="setting-ambience">0 %</output></div>
+      <div class="volume-row"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill gold" d="M10 2.5l1.7 5.3 5.3 1.7-5.3 1.7L10 16.5l-1.7-5.3L3 9.5l5.3-1.7Z"/><path class="fill gold" d="M18 13.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9Z"/></svg></span><label for="setting-sfx">Efectos</label><input id="setting-sfx" class="volume-slider" type="range" min="0" max="100" step="5"><output id="setting-sfx-value" for="setting-sfx">0 %</output></div>
+    </section>
+    <label class="settings-card settings-toggle" for="setting-effects"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12Z"/><circle class="fill" cx="12" cy="12" r="3.2"/></svg></span><span class="settings-label">Efectos visuales</span><input id="setting-effects" class="settings-check" type="checkbox"></label>
+    <div class="settings-card settings-quality">
+      <div class="settings-quality-row"><span class="settings-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M9 20.5h6M12 16.5v4"/></svg></span><label class="settings-label" for="setting-quality">Calidad gráfica</label>
+        <span class="settings-select"><select id="setting-quality"><option value="auto">Automática · se adapta a tu equipo</option><option value="high">Alta · PC potente</option><option value="low">Baja · mejor rendimiento</option></select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 9.5 12 15l5.5-5.5"/></svg></span></div>
+      <p class="dialog-note">La calidad baja reduce la resolución, las sombras y el brillo. Los cambios se guardan automáticamente.</p>
+    </div>
+    <p id="settings-saved" class="settings-saved" role="status"></p>
+  </div>
+</dialog>
 
 <div id="fatal"></div>
 <dialog id="pause-modal" class="pause-dialog">
