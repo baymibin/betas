@@ -40,6 +40,19 @@ export function predictSelfPower(p){
  if(kind!==1&&kind!==2&&kind!==7)return;
  if(applySelfPower(p,kind))p.heldItem=0;
 }
+// ¿El jugador toca la caja en este tick? (cruza su z o está encima, a su altura). La misma regla
+// la usan el servidor (stepPowerWorld) y la predicción del cliente (predictBoxPickup).
+export function touchesBox(p,prevZ,box){
+ const crossed=prevZ>box.z&&p.z<=box.z, overlap=p.z<=box.z&&p.z>=box.z-1.2;
+ return (crossed||overlap)&&Math.abs(p.x-box.x)<1.45&&Math.abs(p.y+.8-box.y)<1.35;
+}
+// Predicción de la recogida propia en multijugador: devuelve el id de la caja que el jugador toca
+// en este tick (o -1). El servidor confirma después; hasta entonces el cliente ya la hace estallar.
+export function predictBoxPickup(world,p,prevZ){
+ if(!world?.boxes||p.heldItem||p.countdown!==0||p.place)return -1;
+ for(const box of world.boxes)if(!world.taken.has(box.id)&&touchesBox(p,prevZ,box))return box.id;
+ return -1;
+}
 export function stepPowerWorld(world,players,uses=[],random=Math.random){
  const active=players.filter(p=>p.countdown===0&&!p.place&&-p.z<2880);
  for(const p of active){
@@ -60,12 +73,7 @@ export function stepPowerWorld(world,players,uses=[],random=Math.random){
   const target=active.find(q=>q.id===p.slipTarget);p.slipActive=p.slipTicks>0&&target&&p.z-target.z>0&&p.z-target.z<45&&Math.abs(p.x-target.x)<3?1:0;
  }
  for(const box of world.boxes){if(world.taken.has(box.id))continue;
-  const contenders=active.filter(p=>{
-   if(p.heldItem)return false;
-   const crossed=(world.previous.get(p.id)??p.z)>box.z&&p.z<=box.z;
-   const overlap=p.z<=box.z&&p.z>=box.z-1.2;
-   return (crossed||overlap)&&Math.abs(p.x-box.x)<1.45&&Math.abs(p.y+.8-box.y)<1.35;
-  });
+  const contenders=active.filter(p=>!p.heldItem&&touchesBox(p,world.previous.get(p.id)??p.z,box));
   contenders.sort((a,b)=>{const az=world.previous.get(a.id)??a.z,bz=world.previous.get(b.id)??b.z;return (az-box.z)/(az-a.z||1)-(bz-box.z)/(bz-b.z||1)||a.id-b.id;});
   const p=contenders[0];if(p){world.taken.add(box.id);const pool=ahead(p,active)?[1,2,2,3,4,5,6,7,8]:[1,2,4,5,6,7];p.heldItem=pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];p.itemRollEnd=(p.raceTicks||0)+ITEM_ROLL_TICKS;}
  }
