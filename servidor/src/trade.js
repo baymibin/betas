@@ -343,12 +343,14 @@ export function createTrade(db, economy, config = {}) {
   }
   // Tablón: las publicaciones abiertas de los demás (o las propias con mine). Las que ofrecen algo
   // que su dueño ya no tiene se cierran aquí mismo como INVALID.
+  // Tablón: todas las publicaciones abiertas, también las propias (marcadas mine: antes el dueño no
+  // veía la suya, creía que no se había publicado, lo repetía y recibía listing_exists 409).
   async function listings(viewerId, {mine = false} = {}) {
     await expireListings();
     const rows = await db.all(`SELECT l.id, l.user_id, l.created_at AS createdAt, l.expires_at AS expiresAt, u.nickname, u.avatar_url AS avatarUrl, p.public_code AS code,
         (SELECT COUNT(*) FROM trade_listing_offers lo JOIN trade_offers o ON o.id = lo.offer_id WHERE lo.listing_id = l.id AND o.status = 'OPEN') AS offers
       FROM trade_listings l JOIN users u ON u.id = l.user_id LEFT JOIN trade_profiles p ON p.user_id = l.user_id
-      WHERE l.status = 'OPEN' AND ${mine ? 'l.user_id = ?' : `l.user_id <> ? AND NOT EXISTS (SELECT 1 FROM trade_blocks b WHERE (b.user_id = l.user_id AND b.blocked_user_id = ?) OR (b.user_id = ? AND b.blocked_user_id = l.user_id))`}
+      WHERE l.status = 'OPEN' AND ${mine ? 'l.user_id = ?' : `(l.user_id = ? OR NOT EXISTS (SELECT 1 FROM trade_blocks b WHERE (b.user_id = l.user_id AND b.blocked_user_id = ?) OR (b.user_id = ? AND b.blocked_user_id = l.user_id)))`}
       ORDER BY l.created_at DESC LIMIT 60`, mine ? [viewerId] : [viewerId, viewerId, viewerId]);
     const items = await listingItems(rows.map(r => r.id));
     const mineOwned = new Set((await db.all('SELECT item_id FROM user_inventory_v2 WHERE user_id = ?', [viewerId])).map(r => r.item_id));

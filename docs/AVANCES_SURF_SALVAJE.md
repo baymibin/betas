@@ -818,6 +818,13 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 
 ## 29. Historial
 
+### 2026-09-29 · Trades públicos: el dueño ve su publicación (antes, 409 al repetir)
+- El tablón "Todas" excluía las publicaciones propias. El jugador publicaba, no la veía, lo repetía y el servidor respondía `409 listing_exists`.
+- Ahora "Todas" incluye las propias, marcadas "Tu publicación" y con el botón Retirar.
+- Al publicar, o si ya existía la misma publicación, se abre Trades públicos → Mis publicaciones con el aviso.
+- Traducciones nuevas del constructor de trades: "Lo que buscas", "EN USO", "1 item seleccionado", "Buscas:", "caducada"…
+- Probado en Chromium (publicar, repetir, ver en Todas) y en `trade.test.js` (SQLite y MariaDB).
+
 ### 2026-09-28 · Inglés por defecto con selector de idioma y auditoría de seguridad
 - Idiomas: inglés por defecto, español con la bandera. Traducción de toda la interfaz sin tocar el código de cada pantalla.
 - Auditoría de login, registro y compras:
