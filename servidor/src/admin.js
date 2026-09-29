@@ -60,7 +60,7 @@ function decodeImage(dataUrl, maxBytes) {
   return {buffer, type};
 }
 
-export function createAdmin(db, {economy, trade, config, uploadsDir, secure = false}) {
+export function createAdmin(db, {economy, trade, config, uploadsDir, secure = false, audit: security = null}) {
   const attempts = new Map();   // "ip|usuario" -> {fails, until}
   setInterval(() => { const now = Date.now(); for (const [k, v] of attempts) if (v.until < now && !v.fails) attempts.delete(k); }, 60_000).unref();
 
@@ -325,6 +325,12 @@ export function createAdmin(db, {economy, trade, config, uploadsDir, secure = fa
     return economySettings();
   }
 
-  return {setUser, countUsers, login, session, logout, cookie, clearCookie, audit, stats, users, user, grant, giveItem, removeItem,
+  // Registro de seguridad de las cuentas (inicios de sesión, compras, pagos...): solo lectura.
+  async function securityEvents(filters = {}) {
+    if (!security) return {events: [], summary: null};
+    return {events: await security.list(filters), summary: await security.summary()};
+  }
+
+  return {security: securityEvents, setUser, countUsers, login, session, logout, cookie, clearCookie, audit, stats, users, user, grant, giveItem, removeItem,
     purchases, transactions, trades, revertTrade, auditLog, catalog, updateItem, upload, economySettings, updateEconomy, slots: SLOTS};
 }

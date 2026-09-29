@@ -192,3 +192,12 @@
 /* Pantallas bajas: el logo y el lema ceden sitio para que el acceso y los controles quepan abajo. */
 @media(max-height:820px) and (min-width:701px){.home-logo svg{width:min(330px,60vw)}.home-play>p{margin:4px 0 12px}.home-main{padding-top:14px;padding-bottom:14px}}
 @media(max-height:680px) and (min-width:701px){.home-login-label{display:none}.home-login .auth-btn{height:38px}.home-play>p{display:none}}
+
+/* ---------- Idiomas (2026-09-28): banderas junto a "MULTIJUGADOR · HASTA 8 SURFISTAS" ---------- */
+.lang-flags{display:inline-flex;align-items:center;gap:5px;margin-left:10px;padding-left:10px;border-left:1px solid #8feaf044}
+.lang-flags button{display:grid;place-items:center;width:30px;height:22px;padding:2px;border-radius:6px;border:1px solid transparent;background:transparent;cursor:pointer;opacity:.55;transition:opacity .15s,transform .15s,border-color .15s}
+.lang-flags button img{width:24px;height:16px;border-radius:3px;box-shadow:0 1px 4px #0006;display:block}
+.lang-flags button:hover{opacity:.9;transform:translateY(-1px)}
+.lang-flags button.is-active{opacity:1;border-color:#ffd257;background:#ffd25722}
+html.i18n-pending body{visibility:hidden}
+@media(max-width:700px){.home-online{display:inline-flex!important;font-size:0;padding:4px 8px;gap:0}.home-online .home-online-icon,.home-online b{display:none}.lang-flags{margin:0;padding:0;border:0}}

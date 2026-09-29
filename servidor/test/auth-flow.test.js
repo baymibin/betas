@@ -240,3 +240,23 @@ test('shop, exchange and admin credit go through the backend with CSRF and idemp
   });
   assert.deepEqual([guest.nick, guest.wing, guest.character], ['Invitado', 0, 2]);
 });
+
+// Registro de seguridad (migración 005): lo que hicieron las pruebas anteriores queda anotado en
+// security_events, sin secretos, y la página lleva cabeceras contra clickjacking.
+test('security events record logins, registrations, purchases and rejected requests', async () => {
+  const {openDatabase} = await import('../src/db.js');
+  const db = await openDatabase(process.env.TEST_DB);
+  try {
+    const rows = await db.all('SELECT event, outcome, user_id AS userId, ip, detail FROM security_events ORDER BY id');
+    const has = (event, outcome) => rows.some(r => r.event === event && r.outcome === outcome);
+    for (const [event, outcome] of [['auth.register', 'ok'], ['auth.login', 'ok'], ['auth.login', 'fail'], ['auth.link', 'ok'], ['shop.purchase', 'ok'],
+      ['coins.exchange', 'ok'], ['payments.checkout', 'fail'], ['payments.webhook', 'fail'], ['auth.logout', 'ok']]) assert.ok(has(event, outcome), `falta ${event} ${outcome}`);
+    assert.ok(rows.filter(r => r.event === 'auth.login' && r.outcome === 'ok').every(r => r.userId && r.ip), 'los inicios de sesión llevan cuenta e IP');
+    const text = JSON.stringify(rows);
+    assert.doesNotMatch(text, /code=|access_token|ss_session=|state=|Bearer |eyJ[A-Za-z0-9_-]{10}/, 'no se guardan secretos (códigos, tokens, cookies ni JWT)');
+  } finally { await db.close(); }
+  const page = await fetch(BASE + '/');
+  assert.equal(page.headers.get('x-frame-options'), 'DENY');
+  assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+});
