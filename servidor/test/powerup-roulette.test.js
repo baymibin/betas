@@ -64,3 +64,29 @@ test('the roulette travels in the snapshot relative to the race clock', () => {
   const done = states(read(snapshot([{...p, itemRollEnd: 10}], 1)))[0];
   assert.equal(itemRolling(done), false);
 });
+
+// Multijugador: la predicción de recogida del cliente (predictBoxPickup) usa la misma regla que
+// el servidor (touchesBox en stepPowerWorld): para un surfista que recorre la pista, la caja que
+// el cliente hace estallar es la misma y en el mismo tick que la que el servidor le entrega.
+test('client box-pickup prediction matches the server tick by tick', async () => {
+  const {predictBoxPickup} = await import('../../client/src/shared/powerups.js');
+  let pickups = 0;
+  for (const seed of [1, 7, 42]) for (const lane of [-6, -3, -1.5, 0, 1.5, 3, 6]) {
+    const world = createPowerWorld(seed), client = {boxes: world.boxes, taken: new Set()};
+    const p = Object.assign(racer(1, 0), {x: lane});
+    let predictedAt = null, grantedAt = null, predictedId = -1, grantedId = -1;
+    for (let tick = 1; tick <= 900 && grantedAt === null; tick++) {
+      const buttons = tick % 40 === 0 ? 1 : 0;   // algún salto: también las cajas aéreas
+      const prevZ = p.z;
+      advance(p, 0, buttons | 8);
+      if (predictedAt === null) { const id = predictBoxPickup(client, p, prevZ); if (id >= 0) { predictedAt = tick; predictedId = id; } }
+      const before = new Set(world.taken);
+      stepPowerWorld(world, [p], [], () => 0);
+      for (const id of world.taken) if (!before.has(id)) { grantedAt = tick; grantedId = id; }
+    }
+    // Misma caja y mismo tick; y si el servidor no entrega ninguna, el cliente no predice ninguna.
+    assert.deepEqual([predictedId, predictedAt], [grantedId, grantedAt], `semilla ${seed}, carril ${lane}`);
+    if (grantedAt !== null) pickups++;
+  }
+  assert.ok(pickups >= 5, `se comprobaron ${pickups} recogidas`);
+});

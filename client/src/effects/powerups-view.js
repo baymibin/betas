@@ -243,7 +243,9 @@ export function createPowerView(B, scene, use) {
   });
 
   const entities = new Map();
-  let taken = new Set(), locallyTaken = new Set(), lastItem = 0, lastTime = 0, shown = null;
+  // rivalPending: cajas que cogió otro jugador; se muestran al mismo retraso con el que se dibujan
+  // los rivales (world.remoteDelay, 110 ms en línea) para que la caja estalle cuando el rival llega.
+  let taken = new Set(), locallyTaken = new Set(), rivalPending = new Map(), lastItem = 0, lastTime = 0, shown = null;
   let lastTimerHtml='',lastWarning='';
   const visibleBoxes=[],live=new Set();
 
@@ -353,7 +355,7 @@ export function createPowerView(B, scene, use) {
     },
     reset() {
       taken = new Set();
-      locallyTaken = new Set();
+      locallyTaken = new Set(); rivalPending = new Map();
       lastItem = 0;
       shown = null;
       burst = null;
@@ -373,8 +375,26 @@ export function createPowerView(B, scene, use) {
       const dt = Math.min(0.1, Math.max(0, time - lastTime));
       lastTime = time;
       const boxes = world.boxes || [];
+      // Multijugador: recogida propia predicha por el cliente (network.js → world.predicted). La
+      // caja estalla y desaparece al tocarla; antes se esperaba al servidor (~1 viaje de red), el
+      // jugador ya la había atravesado y la explosión salía detrás de la cámara (no se veía).
+      const predicted = world.predicted;
+      if (predicted) for (const id of predicted.keys()) {
+        if (taken.has(id)) continue;
+        taken.add(id); locallyTaken.add(id);
+        const box = boxes[id];
+        if (box) { const f = trackFrame(-box.z, box.x); burst = {x: f.x, y: f.y + box.y, z: f.z, start: time}; playSound('impact'); }
+      }
+      // Si el servidor no la confirma (otro la cogió antes o la predicción falló), vuelve a verse.
+      for (const id of locallyTaken) {
+        if (world.taken.has(id)) locallyTaken.delete(id);
+        else if (!predicted?.has(id)) { locallyTaken.delete(id); taken.delete(id); }
+      }
+      // Cajas cogidas por otros: se programan con el retraso de dibujo de los rivales.
+      const delay = world.remoteDelay || 0;
+      for (const id of world.taken) if (!taken.has(id) && !rivalPending.has(id)) rivalPending.set(id, time + delay);
       visibleBoxes.length=0;
-      for(const box of boxes)if(!world.taken.has(box.id)&&box.z<p.z+12&&box.z>p.z-190)visibleBoxes.push(box);
+      for(const box of boxes)if((!world.taken.has(box.id)||rivalPending.has(box.id))&&!predicted?.has(box.id)&&box.z<p.z+12&&box.z>p.z-190)visibleBoxes.push(box);
 
       // Flotación y giro de cubo (mismo movimiento que antes).
       crates.forEach((root, i) => {
@@ -389,8 +409,10 @@ export function createPowerView(B, scene, use) {
       });
 
       // Authoritative pickup synchronization - triggers burst and sound only when powerup is actually awarded
-      for (const id of world.taken) {
-        if (!taken.has(id)) {
+      for (const [id, due] of rivalPending) {
+        if (time >= due) {
+          rivalPending.delete(id);
+          if (taken.has(id)) continue;
           taken.add(id);
           const box = boxes[id];
           if (box && Math.abs(box.z - p.z) < 35) {

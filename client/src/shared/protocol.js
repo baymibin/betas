@@ -12,9 +12,12 @@ export function powerWorldPacket(world,tick=0){
  v.setUint32(16,world.seed,true);v.setUint16(12,taken.length,true);v.setUint16(14,entities.length,true);taken.forEach((id,i)=>v.setUint8(20+i,id));
  entities.forEach((e,i)=>{const o=20+taken.length+i*32;v.setUint32(o,e.id,true);v.setUint8(o+4,e.kind);v.setUint32(o+8,e.owner,true);v.setUint32(o+12,e.target,true);v.setFloat32(o+16,e.x,true);v.setFloat32(o+20,e.z,true);v.setFloat32(o+24,e.y,true);v.setUint16(o+28,e.ttl,true);});return v.buffer;
 }
+// Las cajas dependen solo de la semilla: se reutilizan (antes se regeneraban 30 veces por segundo).
+let boxCache={seed:null,boxes:null};
+const boxesFor=seed=>boxCache.seed===seed?boxCache.boxes:(boxCache={seed,boxes:makeBoxes(seed)}).boxes;
 export function readPowerWorld(v){
  if(v.byteLength<20)throw Error('Invalid powers');const count=v.getUint16(12,true),n=v.getUint16(14,true);if(count>48||n>64||v.byteLength!==20+count+n*32)throw Error('Invalid powers');
- return {seed:v.getUint32(16,true),boxes:makeBoxes(v.getUint32(16,true)),taken:new Set(Array.from({length:count},(_,i)=>v.getUint8(20+i))),entities:Array.from({length:n},(_,i)=>{const o=20+count+i*32;return {id:v.getUint32(o,true),kind:v.getUint8(o+4),owner:v.getUint32(o+8,true),target:v.getUint32(o+12,true),x:v.getFloat32(o+16,true),z:v.getFloat32(o+20,true),y:v.getFloat32(o+24,true),ttl:v.getUint16(o+28,true)};})};
+ return {seed:v.getUint32(16,true),boxes:boxesFor(v.getUint32(16,true)),taken:new Set(Array.from({length:count},(_,i)=>v.getUint8(20+i))),entities:Array.from({length:n},(_,i)=>{const o=20+count+i*32;return {id:v.getUint32(o,true),kind:v.getUint8(o+4),owner:v.getUint32(o+8,true),target:v.getUint32(o+12,true),x:v.getFloat32(o+16,true),z:v.getFloat32(o+20,true),y:v.getFloat32(o+24,true),ttl:v.getUint16(o+28,true)};})};
 }
 // ROOM_LIST: registro de 44 bytes · 0..5 código · 6 mapa · 7 humanos · 8..40 anfitrión · 41 capacidad · 42 en carrera · 43 bots.
 export function roomList(rooms){

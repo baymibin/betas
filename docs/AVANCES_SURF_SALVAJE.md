@@ -818,6 +818,22 @@ Checklist de prueba con credenciales reales (para cada proveedor):
 
 ## 29. Historial
 
+### 2026-09-29 · Las cajas no estallaban en multijugador
+- **Causa:**
+  - En línea, la explosión solo salía cuando el servidor confirmaba la recogida, un viaje de red después.
+  - Para entonces el jugador ya había atravesado la caja y la explosión salía detrás de la cámara (medido: 6,5 unidades por detrás). No se veía.
+  - En solitario no pasa porque la simulación es local.
+- **Arreglo:**
+  - **Recogida propia predicha:** `touchesBox()` es ahora la regla única de recogida, compartida por el servidor (`stepPowerWorld`) y el cliente (`predictBoxPickup`, en cada tick de la predicción de `network.js`).
+    - La caja estalla y desaparece al tocarla.
+    - Si el servidor no la confirma en 1,5 s, vuelve a verse.
+    - Solo se predice una caja a la vez (el jugador lleva un poder).
+  - **Recogidas de los rivales:** se muestran con el mismo retraso con el que se dibujan los rivales (`INTERP_DELAY`, 110 ms). Antes la caja estallaba y desaparecía antes de que el rival llegara a ella.
+  - **Rendimiento:** en línea, las 48 cajas se regeneraban 30 veces por segundo con cada paquete. Ahora se reutilizan por semilla.
+- **Pruebas:**
+  - Nueva prueba: para 21 recorridos (semillas y carriles, con saltos), el cliente predice la misma caja y en el mismo tick que el servidor la entrega, y nunca predice una que el servidor no entregue.
+  - En Chromium en línea: al predecir la recogida, la caja estalla al momento, y si el servidor no la confirma vuelve a aparecer.
+
 ### 2026-09-29 · Trades públicos: el dueño ve su publicación (antes, 409 al repetir)
 - El tablón "Todas" excluía las publicaciones propias. El jugador publicaba, no la veía, lo repetía y el servidor respondía `409 listing_exists`.
 - Ahora "Todas" incluye las propias, marcadas "Tu publicación" y con el botón Retirar.

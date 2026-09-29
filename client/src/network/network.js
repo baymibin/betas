@@ -1,11 +1,11 @@
-import {RemoteTimeline} from './remote-timeline.js';
+import {RemoteTimeline,INTERP_DELAY} from './remote-timeline.js';
 import {TYPE,readPowerWorld,read,input,states,profilePacket,roomRequest,readRoom,packet,roomBots,PROTOCOL_VERSION} from '../shared/protocol.js';
 import {advance,DT} from '../shared/simulation.js';
-import {predictSelfPower} from '../shared/powerups.js';
+import {predictSelfPower,predictBoxPickup} from '../shared/powerups.js';
 export class SurfNetwork {
-  constructor(status) { this.status=status; this.pending=[]; this.remote=[]; this.buttons=0; this.axis=0; this.seq=0; this.errorX=0; this.errorZ=0; }
+  constructor(status) { this.status=status; this.pending=[]; this.remote=[]; this.buttons=0; this.axis=0; this.seq=0; this.errorX=0; this.errorZ=0; this.predictedTaken=new Map(); }
   connect(profile,options={mode:1,mapId:0}) {
-    this.close();this.room=null;this.options=options;this.powerWorld={taken:new Set(),entities:[]};this.timeline=new RemoteTimeline();
+    this.close();this.room=null;this.options=options;this.predictedTaken=new Map();this.powerWorld={taken:new Set(),entities:[],predicted:this.predictedTaken};this.timeline=new RemoteTimeline();
     this.pending=[]; this.remote=[]; this.seq=0; this.buttons=0; this.player=null;this.authoritative=null;this.errorX=0;this.errorZ=0;this.prev=null;
     return new Promise((resolve,reject) => {
       const ws=this.ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/play`);
@@ -23,7 +23,10 @@ export class SurfNetwork {
             ws.send(profilePacket(profile,this.legacyServer));ws.send(roomRequest(options.mode,options.mapId||0,options.code||'',options.capacity||8,this.supportsBots&&options.mode===1?(options.bots|0):null,this.supportsBots&&options.mode===1&&!!options.private)); return; }
           if(type===TYPE.ROOM_STATE){this.room=readRoom(v);this.onRoom?.(this.room,[]);return;}
           if(type===TYPE.ERROR){clearTimeout(timeout);reject(Error(v.byteLength>12&&v.getUint8(12)===2?'Este circuito estará disponible próximamente.':'Sala no disponible: revisa el codigo, puede estar llena o haber comenzado.'));this.close();return;}
-          if(type===TYPE.POWER_WORLD){this.powerWorld=readPowerWorld(v);return;}
+          if(type===TYPE.POWER_WORLD){this.powerWorld=readPowerWorld(v);
+            // Recogidas predichas: se olvidan al confirmarlas el servidor o a los 1,5 s si no llega.
+            const now=performance.now();for(const [id,at] of this.predictedTaken)if(this.powerWorld.taken.has(id)||now-at>1500)this.predictedTaken.delete(id);
+            this.powerWorld.predicted=this.predictedTaken;this.powerWorld.remoteDelay=INTERP_DELAY/1000;return;}
           if(type!==TYPE.SNAPSHOT) return;
           const list=states(v), own=list.find(p=>p.id===this.id);
           if(!own) return;
@@ -56,7 +59,12 @@ export class SurfNetwork {
   // Un tick de predicción: la física y, si se pulsó E, el efecto propio de Tiki/Ola cohete/Delfín
   // (mismo orden que el servidor: advance y después stepPowerWorld). El resto de poderes depende
   // de otros jugadores y sigue llegando del servidor.
-  step(p,c){advance(p,c.axis,c.buttons);if(c.buttons&4)predictSelfPower(p);}
+  // También predice la recogida de cajas (misma regla que el servidor, touchesBox): la caja
+  // estalla y desaparece al tocarla, sin esperar el viaje de red. Solo una a la vez (el jugador
+  // lleva un poder): mientras hay una predicha sin confirmar no se predicen más.
+  step(p,c){const prevZ=p.z;advance(p,c.axis,c.buttons);if(c.buttons&4)predictSelfPower(p);
+    const now=performance.now();if([...this.predictedTaken.values()].some(at=>now-at<1500))return;
+    const id=predictBoxPickup(this.powerWorld,p,prevZ);if(id>=0&&!this.predictedTaken.has(id))this.predictedTaken.set(id,now);}
   // Estado a dibujar: interpolado entre el tick anterior y el actual (los ticks van a 30 Hz y el
   // render a la tasa del monitor) más el error de corrección pendiente, que decae con dt.
   view(dt){const k=Math.exp(-20*dt);this.errorX*=k;this.errorZ*=k;
