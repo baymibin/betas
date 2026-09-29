@@ -173,7 +173,7 @@ for (const [engine, url] of engines) {
     await expectCode(tr.publish(a, {offer: ['wing:5'], want: ['board:3'], requestId: rid()}), 'listing_exists');
     const seen = await tr.listings(b);
     assert.deepEqual([seen.length, seen[0].id, seen[0].give, seen[0].want, seen[0].mine], [1, listingId, ['wing:5'], ['board:3'], false]);
-    assert.equal((await tr.listings(a)).length, 0, 'el dueño no ve la suya en el tablón');
+    assert.deepEqual((await tr.listings(a)).map(l => [l.id, l.mine]), [[listingId, true]], 'el dueño ve la suya en el tablón, marcada como suya');
     assert.equal((await tr.listings(a, {mine: true})).length, 1);
     assert.equal((await tr.summary(b)).publicCount, 1);
     await expectCode(tr.withdrawListing(b, listingId), 'listing_not_found');

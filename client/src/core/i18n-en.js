@@ -166,7 +166,8 @@ export const EN = {
   'Tu cuenta es muy nueva: podrás hacer trades a partir del': 'Your account is very new: you can trade starting', 'Buscando...': 'Searching...',
   'Hay un bloqueo entre vosotros: no podéis hacer trades.': 'There is a block between you: you can’t trade.', 'Toca un item para verlo en 3D.': 'Tap an item to see it in 3D.',
   'Resumen del trade': 'Trade summary', 'Entregas': 'You give', 'Recibes': 'You get', 'Ofreces': 'You offer', 'Buscas': 'You want', 'Volver': 'Back',
-  'Ofreces:': 'You offer:', 'Recibes:': 'You get:', 'items seleccionados': 'items selected', 'Todos los items': 'All items',
+  'Ofreces:': 'You offer:', 'Recibes:': 'You get:', 'Buscas:': 'You want:', 'Entregas:': 'You give:', 'items seleccionados': 'items selected', 'item seleccionado': 'item selected',
+  'Lo que buscas': 'What you want', 'EN USO': 'IN USE', 'YA LO TIENES': 'YOU HAVE IT', 'Retirar publicación': 'Withdraw listing', 'Negociar': 'Negotiate', 'Acepta ofertas': 'Open to offers', 'Tu publicación': 'Your listing', 'caducada': 'expired', 'Todos los items': 'All items',
   'Los items que entregas dejarán de ser tuyos. Si llevas alguno puesto, volverás al gratuito.': 'The items you give will no longer be yours. If you are wearing one, you will go back to the free one.',
   '¿Enviar': 'Send', 'Nada cambia de dueño hasta que la otra persona la acepte. Puedes cancelarla desde "Ofertas enviadas".': 'Nothing changes hands until the other person accepts it. You can cancel it from "Sent offers".',
   'Oferta enviada a': 'Offer sent to', '¿Publicar en Trades públicos?': 'Post in Public trades?', 'Aceptas ofertas': 'You accept offers',
@@ -251,6 +252,7 @@ export const EN_PATTERNS = [
   [/\bVUELTA (\d+)\b/g, (m, a) => `LAP ${a}`],
   [/(\d+) vueltas\b/g, (m, a) => `${a} laps`],
   [/(\d+) jugadores\b/g, (m, a) => `${a} players`],
+  [/^(\d+) ofertas? recibidas?$/, (m, n) => `${n} offer${n === '1' ? '' : 's'} received`],
   [/(\d+)º/g, (m, n) => n + (/1[123]$/.test(n) ? 'th' : ({1: 'st', 2: 'nd', 3: 'rd'})[n.slice(-1)] || 'th')],
   [/^(.+) ya es tuyo!$/, (m, item) => `${item} is yours!`],
   [/\bHace (\d+) (min|h|d)\b/g, (m, n, u) => `${n} ${u} ago`]

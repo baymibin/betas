@@ -294,9 +294,20 @@ async function publishListing() {
   st.busy = true; renderBuilder();
   try {
     await trade.publish({offer: st.offer, want: st.request});
-    Object.assign(st, {offer: [], request: [], focus: null, source: 'mine'});
+    Object.assign(st, {offer: [], request: [], focus: null, source: 'mine', busy: false, publicMine: true, listings: []});
+    // Se lleva al jugador a sus publicaciones para que vea que ya está en el tablón.
+    openTab('public');
     say('¡Publicado! Lo verán todos en Trades públicos y las ofertas te llegarán a "Ofertas recibidas".');
-  } catch (e) { say(e.detail?.itemId ? `${message(e.code)} (${itemName(e.detail.itemId)})` : message(e.code), true); }
+    return;
+  } catch (e) {
+    if (e.code === 'listing_exists') {   // ya estaba publicada: se enseña en vez de solo dar el error
+      Object.assign(st, {busy: false, publicMine: true, listings: []});
+      openTab('public');
+      say(message(e.code), true);
+      return;
+    }
+    say(e.detail?.itemId ? `${message(e.code)} (${itemName(e.detail.itemId)})` : message(e.code), true);
+  }
   st.busy = false; renderNew();
 }
 
